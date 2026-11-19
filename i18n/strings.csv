@@ -86,6 +86,29 @@ RULES_INSERTION_1,The top part of the column is sorted (green line).,Górna czę
 RULES_INSERTION_2,The gold KEY is the first number below it. Pick where it goes and press SPACE.,Złoty KLUCZ to pierwsza liczba pod nią. Wybierz dla niego miejsce i wciśnij SPACJĘ.
 RULES_INSERTION_3,"Put it where it fits: smaller above, bigger below. Each number it passes costs 1 move.","Wstaw go tam, gdzie pasuje: mniejsze wyżej, większe niżej. Każda mijana liczba to 1 ruch."
 RULES_INSERTION_4,"The smallest number leaves through the exit. When the whole column is sorted, they all leave in a chain.","Najmniejsza liczba wychodzi wyjściem. Gdy cała kolumna jest posortowana, wychodzą łańcuchem."
-RULES_ADVERSARY,BOSS: every newcomer is the worst one for this algorithm.,BOSS: każdy nowy to najgorszy przypadek dla tego algorytmu.
+RULES_ADVERSARY,"BOSS: every newcomer is the worst one, and it swaps a sorted pair every few moves (dodge it).","BOSS: każdy nowy to najgorszy przypadek, a co kilka ruchów zamienia posortowaną parę (rób uniki)."
 RULES_PIC_BUBBLE,9 is lower and bigger: swap.,9 jest niżej i większa: zamiana.
 RULES_PIC_INSERTION,4 goes between 2 and 5.,4 trafia między 2 i 5.
+BOSS_LABEL,BOSS,BOSS
+BOSS_NAME_ADVERSARY,THE ADVERSARY,ADWERSARZ
+BOSS_INTRO_1,Its numbers are bigger than anything on the board and cursed: they score half.,Jego liczby są większe niż wszystko na planszy i przeklęte: dają połowę punktów.
+BOSS_INTRO_2,Every %d moves it strikes: it swaps a sorted pair (move it first to dodge) or throws in a number. At half HP it gets angry.,"Co %d ruchy atakuje: zamienia posortowaną parę (rusz ją pierwszy, żeby zrobić unik) albo wrzuca liczbę. Przy połowie HP wpada we wściekłość."
+BOSS_FIGHT,SPACE: fight,SPACJA: do walki
+BOSS_HP,ADVERSARY HP,HP ADWERSARZA
+BOSS_STRIKES_IN,Moves until the Adversary strikes: %d,Ruchy do ataku Adwersarza: %d
+BOSS_AIMING,It is aiming at the red pair! Move it to dodge.,"Celuje w czerwoną parę! Rusz ją, żeby zrobić unik."
+BOSS_STRIKE,STRIKE!,ATAK!
+BOSS_DODGED,DODGED!,UNIK!
+NEXT_BOSS,NEXT: THE BOSS. CHOOSE WELL.,NASTĘPNY: BOSS. WYBIERAJ MĄDRZE.
+FX_MOVE_BACK,+1 move,+1 ruch
+FX_SAVED,life saved,życie ocalone
+FX_CHEAPER,cheaper,taniej
+FX_FREE,free move,darmowy ruch
+FX_EXPRESS,express!,ekspres!
+ITEM_EXPRESS_LANE_NAME,Express Lane,Pas ekspresowy
+ITEM_EXPRESS_LANE_DESC,Bubble: lifting the biggest number carries it up to 3 more places for free.,Bubble: podniesienie największej liczby niesie ją do 3 pól wyżej za darmo.
+BOSS_DEFEATED,BOSS DEFEATED,BOSS POKONANY
+BOSS_ENRAGED,ENRAGED!,WŚCIEKŁOŚĆ!
+BOSS_PHASE_2,· PHASE 2,· FAZA 2
+BOSS_AIMING_THROW,After your next move it throws in an extra number!,Po twoim ruchu wrzuci dodatkową liczbę!
+BOSS_THROW,THROWN IN!,WRZUTKA!

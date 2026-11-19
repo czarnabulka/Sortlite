@@ -57,7 +57,11 @@ func order_batch(values: Array[int]) -> Array[int]:
 	return out
 
 
-## At least as big as everything on the board: it must cross the whole column.
+## Bigger than everything on the board, so it must cross the whole column.
+## Never equal to the biggest: a stack of equal maxima would leave for free.
+## Once the board holds vmax, it sends values just under it instead.
 func adversary_value(board: Board, rng: RandomNumberGenerator, vmax: int) -> int:
-	var lo := board.max_value() if not board.is_empty() else vmax / 2
-	return rng.randi_range(mini(lo, vmax), vmax)
+	var top := board.max_value() if not board.is_empty() else vmax / 2
+	if top >= vmax:
+		return rng.randi_range(maxi(vmax - 3, 1), vmax - 1)
+	return rng.randi_range(top + 1, vmax)

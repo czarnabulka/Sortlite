@@ -27,6 +27,7 @@ const RISE_DUR := 0.12
 const POP_DUR := 0.24
 const CHAIN_STEP := 0.16
 const DEMO_STEP := 0.32
+const CURSED_COLOR := Color("b04ad6")
 ## How far the Insertion key sticks out of the column.
 const KEY_PULL := 12.0
 
@@ -60,6 +61,7 @@ class Ghost:
 	var gained := 0
 	var chain := 1
 	var notes: Array[StringName] = []
+	var effects: Array[Dictionary] = []
 
 
 class Floater:
@@ -82,6 +84,10 @@ var help_open := false
 ## The rules card of this room's algorithm (I). Opens by itself the first
 ## time an algorithm shows up in a run. The room waits while a card is open.
 var rules_open := false
+## The boss card: who you are fighting and what it does. Opens on a boss room.
+var boss_intro_open := false
+## Seconds since the boss started aiming (for the warning to pop in).
+var aim_t := 0.0
 var overlay_t := 0.0
 var intro_t := 0.0
 var end_t := 0.0
@@ -104,6 +110,9 @@ var formula_bump := 0.0
 var shake := 0.0
 var tank_flash := 0.0
 var banner_text := ""
+var banner_color := Palette.GOLD
+## Red screen flash (boss phase two).
+var rage_flash := 0.0
 var banner_delay := 0.0
 var banner_t := 9.0
 var demo_timer := 0.0
@@ -124,6 +133,7 @@ func set_session(p_session: RoomSession, p_room_no: int, p_room_total: int, p_ki
 	end_t = 0.0
 	overlay_t = 0.0
 	rules_open = show_rules
+	boss_intro_open = p_kind == Run.BOSS
 	room_no = p_room_no
 	room_total = p_room_total
 	room_kind = p_kind
@@ -150,6 +160,10 @@ func set_session(p_session: RoomSession, p_room_no: int, p_room_total: int, p_ki
 	bus.on(Events.CHAIN, _on_chain)
 	bus.on(Events.OVERFLOW, _on_overflow)
 	bus.on(Events.ITEM_TRIGGERED, _on_item_triggered)
+	bus.on(Events.BOSS_AIM, _on_boss_aim)
+	bus.on(Events.BOSS_STRIKE, _on_boss_strike)
+	bus.on(Events.BOSS_DODGED, _on_boss_dodged)
+	bus.on(Events.BOSS_ENRAGED, _on_boss_enraged)
 	_reset_selection()
 	_sync_visuals()
 	# The starting numbers rise into the column one after another, once the
@@ -168,6 +182,10 @@ func is_bubble() -> bool:
 	return session.room.algorithm.id == Algorithms.BUBBLE
 
 
+func is_boss() -> bool:
+	return room_kind == Run.BOSS
+
+
 func is_over() -> bool:
 	return not session.is_playing() and ghosts.is_empty()
 
@@ -177,16 +195,20 @@ func is_over() -> bool:
 func handle_input(event: InputEvent, local: Vector2) -> void:
 	if session == null:
 		return
-	if rules_open or help_open:
-		# Any of these closes the card; nothing else happens meanwhile.
+	if boss_intro_open or rules_open or help_open:
+		# Any of these closes the top card; nothing else happens meanwhile.
 		var close := false
 		if event is InputEventKey and event.pressed and not event.echo:
 			close = event.keycode in [KEY_SPACE, KEY_ENTER, KEY_I, KEY_H]
 		elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			close = true
 		if close:
-			rules_open = false
-			help_open = false
+			if boss_intro_open:
+				boss_intro_open = false
+				overlay_t = 0.0
+			else:
+				rules_open = false
+				help_open = false
 		return
 	if event is InputEventKey and event.pressed:
 		var key := event as InputEventKey
@@ -350,6 +372,7 @@ func _on_surface(data: Dictionary) -> void:
 	g.mult = ctx.mult
 	g.gained = ctx.total()
 	g.notes = ctx.notes.duplicate()
+	g.effects = ctx.effects.duplicate(true)
 	ghosts.append(g)
 	vis.erase(ctx.element.uid)
 
@@ -357,6 +380,7 @@ func _on_surface(data: Dictionary) -> void:
 func _on_chain(data: Dictionary) -> void:
 	var length: int = data["length"]
 	banner_text = tr("CHAIN_BANNER") % length
+	banner_color = Palette.GOLD
 	banner_delay = SWAP_DUR + (length - 1) * CHAIN_STEP + RISE_DUR
 	banner_t = -1.0
 
@@ -375,6 +399,65 @@ func _on_item_triggered(data: Dictionary) -> void:
 	var id: StringName = data["id"]
 	item_flash[id] = 0.6
 	focus_item = id
+	var label: String = data.get("label", "")
+	if label != "":
+		_item_float(id, tr(label), Palette.GOLD)
+
+
+func _on_boss_aim(_data: Dictionary) -> void:
+	aim_t = 0.0
+
+
+func _on_boss_strike(data: Dictionary) -> void:
+	if data["mode"] == RoomSession.STRIKE_THROW:
+		shake = 5.0
+		tank_flash = 0.5
+		var t := tr("BOSS_THROW")
+		var tw := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, L).x
+		_float(t, Vector2(TANK_CX - tw * 0.5, _tank_bottom() - 20), Palette.BAD, L)
+		return
+	var j: int = data["index"]
+	var cells := session.room.board.cells
+	pending_arc[cells[j].uid] = 16.0
+	pending_arc[cells[j + 1].uid] = -16.0
+	shake = 6.0
+	tank_flash = 0.6
+	var text := tr("BOSS_STRIKE")
+	var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, L).x
+	_float(text, Vector2(TANK_CX - w * 0.5, _slot_pos(j).y + 10), Palette.BAD, L)
+
+
+func _on_boss_enraged(_data: Dictionary) -> void:
+	banner_text = tr("BOSS_ENRAGED")
+	banner_color = Palette.BAD
+	banner_delay = 0.0
+	banner_t = -1.0
+	rage_flash = 1.0
+	shake = 8.0
+
+
+func _on_boss_dodged(_data: Dictionary) -> void:
+	var text := tr("BOSS_DODGED")
+	var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, M).x
+	_float(text, Vector2(TANK_CX - w * 0.5, TANK_TOP + 120), Palette.GOOD, M)
+
+
+## A short text right over the item's row (what that item just did).
+func _item_float(id: StringName, text: String, color: Color) -> void:
+	var i := -1
+	for k in session.items.size():
+		if session.items[k].id == id:
+			i = k
+	if i < 0:
+		return
+	var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, M).x
+	var f := Floater.new()
+	f.text = text
+	f.pos = Vector2(PANEL_R + PANEL_R_W - w - 6, 118.0 + i * 22.0 + 17.0)
+	f.color = color
+	f.size = M
+	f.life = 1.0
+	floaters.append(f)
 
 
 # --- update ------------------------------------------------------------------
@@ -386,8 +469,12 @@ func _process(delta: float) -> void:
 	intro_t += delta
 	overlay_t += delta
 	end_t = end_t + delta if is_over() else 0.0
-	var paused := rules_open or help_open
-	if demo and rules_open and overlay_t > 1.6:
+	aim_t += delta
+	var paused := boss_intro_open or rules_open or help_open
+	if demo and boss_intro_open and overlay_t > 2.0:
+		boss_intro_open = false
+		overlay_t = 0.0
+	elif demo and rules_open and overlay_t > 1.6:
 		rules_open = false  # the demo reads the card, then plays
 	if not paused:
 		session.update(delta)
@@ -444,6 +531,7 @@ func _process(delta: float) -> void:
 	formula_bump = maxf(formula_bump - delta * 3.0, 0.0)
 	shake = maxf(shake - delta * 18.0, 0.0)
 	tank_flash = maxf(tank_flash - delta, 0.0)
+	rage_flash = maxf(rage_flash - delta * 1.5, 0.0)
 	queue_redraw()
 
 
@@ -505,6 +593,12 @@ func _pop(g: Ghost) -> void:
 	for id in g.notes:
 		item_flash[id] = 0.6
 		focus_item = id
+	for fx in g.effects:
+		var kind: StringName = fx["kind"]
+		var amount: int = fx["amount"]
+		var mult_side := kind == ScoreContext.MULT or kind == ScoreContext.XMULT
+		var text := ("×%d" if kind == ScoreContext.XMULT or kind == ScoreContext.XPOINTS else "+%d") % amount
+		_item_float(fx["id"], text, Palette.MULT.lightened(0.2) if mult_side else Palette.CHIPS.lightened(0.2))
 	# One line per score while earlier ones are still visible, so nothing overlaps.
 	# Bubble: right of the column. Insertion keeps that side for the key and
 	# its arrow, so its scores go on the left.
@@ -529,6 +623,12 @@ func _draw() -> void:
 	draw_rect(Rect2(0, 0, 640, 360), Palette.BG)
 	if session == null:
 		return
+	if is_boss():
+		# A boss room glows red from the edges, slowly breathing.
+		var angry := session.enraged
+		var glow := (0.16 + 0.08 * sin(time * 4.0)) if angry else (0.10 + 0.04 * sin(time * 1.6))
+		for k in 6:
+			draw_rect(Rect2(k * 6, k * 6, 640 - k * 12, 360 - k * 12), Color(Palette.BAD, glow * (1.0 - k / 6.0)), false, 6.0)
 	var off := Vector2(randf_range(-shake, shake), randf_range(-shake, shake)) if shake > 0.0 else Vector2.ZERO
 	# Side panels slide in from the edges when the room starts.
 	var slide := 1.0 - Anim.ease_out_cubic(intro_t / 0.35)
@@ -545,9 +645,13 @@ func _draw() -> void:
 	_draw_floaters()
 	_draw_banner()
 	draw_set_transform(Vector2.ZERO)
+	if rage_flash > 0.0:
+		draw_rect(Rect2(0, 0, 640, 360), Color(Palette.BAD, 0.35 * rage_flash))
 	if is_over():
 		_draw_end_overlay()
-	if rules_open:
+	if boss_intro_open:
+		_draw_boss_intro()
+	elif rules_open:
 		_draw_rules()
 	elif help_open:
 		_draw_help()
@@ -563,12 +667,21 @@ func _draw_left_panel() -> void:
 	_text(tr("ROOM_N_OF") % [room_no, room_total], Vector2(x, 22), M, Palette.MUTED, right, w)
 	_text(tr("ALGO_" + String(room.algorithm.id).to_upper()), Vector2(x, 39), S, Palette.SOFT)
 
-	# Score against target
-	_panel(Rect2(x, 46, w, 66))
-	_text(tr("SCORE"), Vector2(x + 8, 62), S, Palette.MUTED)
-	_text(str(int(shown_score)), Vector2(x + 8, 94), L, Palette.TEXT)
-	_text("/ %d" % room.target, Vector2(x + 8, 94), M, Palette.MUTED, right, w - 16)
-	_bar(Rect2(x + 8, 101, w - 16, 5), shown_score / float(room.target), Palette.GOLD)
+	if is_boss():
+		# Every point you score is damage: the bar empties as the boss loses.
+		_panel(Rect2(x, 46, w, 66), Palette.BAD.darkened(0.2))
+		Icons.draw_boss(self, Rect2(x + w - 40, 52, 32, 32))
+		_text(tr("BOSS_HP") + ("  " + tr("BOSS_PHASE_2") if session.enraged else ""), Vector2(x + 8, 62), S, Palette.BAD.lightened(0.2))
+		var hp := maxi(room.target - int(shown_score), 0)
+		_text(str(hp), Vector2(x + 8, 94), L, Palette.TEXT)
+		_text("/ %d" % room.target, Vector2(x + 8, 94), S, Palette.MUTED, right, w - 56)
+		_bar(Rect2(x + 8, 101, w - 16, 5), float(hp) / float(room.target), Palette.BAD)
+	else:
+		_panel(Rect2(x, 46, w, 66))
+		_text(tr("SCORE"), Vector2(x + 8, 62), S, Palette.MUTED)
+		_text(str(int(shown_score)), Vector2(x + 8, 94), L, Palette.TEXT)
+		_text("/ %d" % room.target, Vector2(x + 8, 94), M, Palette.MUTED, right, w - 16)
+		_bar(Rect2(x + 8, 101, w - 16, 5), shown_score / float(room.target), Palette.GOLD)
 
 	# Move budget
 	_panel(Rect2(x, 118, w, 40))
@@ -602,10 +715,18 @@ func _draw_left_panel() -> void:
 	_text(how, Vector2(x + 8, 274), S, Palette.TEXT, right, w - 16)
 	_text(tr("LET_IN_NOW"), Vector2(x + 8, 293), S, Palette.SOFT)
 
-	# How this room works
-	var hint := "HINT_ADVERSARY" if session.feed == RoomSession.FEED_ADVERSARY else "HINT_" + String(room.algorithm.id).to_upper()
-	draw_multiline_string(font, Vector2(x, 320), tr(hint), HORIZONTAL_ALIGNMENT_LEFT, w, S, 2,
-			Palette.BAD.lightened(0.2) if session.feed == RoomSession.FEED_ADVERSARY else Palette.SOFT)
+	# How this room works; in a boss room, when it strikes next
+	if session.boss != RoomSession.BOSS_NONE:
+		var aiming := session.is_aiming()
+		var warn := tr("BOSS_STRIKES_IN") % session.moves_to_strike
+		if aiming:
+			warn = tr("BOSS_AIMING") if session.is_aiming_pair() else tr("BOSS_AIMING_THROW")
+		var a := 0.6 + 0.4 * sin(time * 10.0) if aiming else 1.0
+		_panel(Rect2(x, 308, w, 40), Palette.BAD if aiming else Palette.BAD.darkened(0.4))
+		draw_multiline_string(font, Vector2(x + 8, 324), warn, HORIZONTAL_ALIGNMENT_LEFT, w - 16, S, 2, Color(Palette.BAD.lightened(0.3), a))
+	else:
+		var hint := "HINT_" + String(room.algorithm.id).to_upper()
+		draw_multiline_string(font, Vector2(x, 320), tr(hint), HORIZONTAL_ALIGNMENT_LEFT, w, S, 2, Palette.SOFT)
 
 
 func _draw_tank() -> void:
@@ -617,7 +738,7 @@ func _draw_tank() -> void:
 	for i in range(1, cap):
 		var y := TANK_TOP + i * SLOT_H
 		draw_line(Vector2(r.position.x + 4, y), Vector2(r.end.x - 4, y), Palette.SLOT_LINE, 1.0)
-	var edge := Palette.PANEL_EDGE
+	var edge := Palette.PANEL_EDGE.lerp(Palette.BAD, 0.45) if is_boss() else Palette.PANEL_EDGE
 	if tank_flash > 0.0:
 		edge = edge.lerp(Palette.BAD, tank_flash * 2.0)
 	elif board.is_full():
@@ -644,10 +765,18 @@ func _draw_tank() -> void:
 			_marker(Vector2(pr.position.x, pr.get_center().y))
 	else:
 		_draw_insertion_guides(r, playing)
+	if playing and session.is_aiming_pair():
+		_draw_aim(r)
 
 	# Next arrival
 	var nb := Rect2(r.position.x, bottom + 5, TANK_W, 40)
-	_panel(nb)
+	var throwing := playing and session.is_aiming() and not session.is_aiming_pair()
+	if throwing:
+		var a := 0.6 + 0.4 * sin(time * 10.0)
+		_panel(nb, Color(Palette.BAD, a), Palette.PANEL.lerp(Palette.BAD, 0.25 * a))
+		Icons.draw_boss(self, Rect2(nb.position.x - 24, nb.position.y + 12, 16, 16), a)
+	else:
+		_panel(nb)
 	_text(tr("NEXT"), Vector2(nb.position.x + 6, nb.position.y + 17), S, Palette.MUTED)
 	var info := tr("IN_N_MOVES") % session.moves_until_arrival() if mode == RoomSession.ArrivalMode.TURNS else "%.1f s" % (session.interval_sec - session.timer)
 	_text(info, Vector2(nb.position.x + 6, nb.position.y + 34), S, Palette.TEXT)
@@ -686,6 +815,27 @@ func _draw_insertion_guides(r: Rect2, playing: bool) -> void:
 	_text(tr("COST_N") % cost, Vector2(lane, gy + 6), S, Palette.BAD if cost > session.room.budget else Palette.TEXT)
 
 
+## The pair the boss will swap after your next move: a red pulsing frame
+## and a warning sign. Move one of them first to dodge.
+func _draw_aim(r: Rect2) -> void:
+	var board := session.room.board
+	var idx: Array[int] = []
+	for i in board.size():
+		if board.cells[i].uid in session.strike_uids:
+			idx.append(i)
+	if idx.size() != 2:
+		return
+	var y1 := minf(_slot_pos(idx[0]).y, _slot_pos(idx[1]).y) - SLOT_H * 0.5
+	var y2 := maxf(_slot_pos(idx[0]).y, _slot_pos(idx[1]).y) + SLOT_H * 0.5
+	var grow := 6.0 * (1.0 - Anim.ease_out_back(aim_t / 0.3))
+	var a := 0.6 + 0.4 * sin(time * 10.0)
+	var box := Rect2(r.position.x - 2 - grow, y1 - grow, r.size.x + 4 + grow * 2, y2 - y1 + grow * 2)
+	draw_rect(box, Color(Palette.BAD, a), false, 2.0)
+	var sign_pos := Vector2(box.position.x - 26, box.get_center().y - 12)
+	Icons.draw_boss(self, Rect2(sign_pos, Vector2(16, 16)), a)
+	_text("!", Vector2(sign_pos.x + 5, sign_pos.y + 34), M, Color(Palette.BAD, a))
+
+
 func _marker(at: Vector2) -> void:
 	draw_colored_polygon(PackedVector2Array([
 		Vector2(at.x - 9, at.y - 5), Vector2(at.x - 3, at.y), Vector2(at.x - 9, at.y + 5)]), Palette.GOLD)
@@ -716,6 +866,9 @@ func _draw_elements() -> void:
 		_text(str(e.value), Vector2(r.position.x, r.position.y + 20), M, Color(Palette.INK, v.alpha), HORIZONTAL_ALIGNMENT_CENTER, EL_W)
 		if NumberProps.is_prime(e.value):
 			draw_rect(Rect2(r.position.x + 4, r.position.y + 4, 3, 3), Color(Palette.INK, 0.6 * v.alpha))
+		if e.has_marker(Element.CURSED):
+			draw_rect(r.grow(1), Color(CURSED_COLOR, v.alpha), false, 2.0)
+			Icons.draw_boss(self, Rect2(r.end.x - 18, r.position.y + 5, 16, 16), v.alpha)
 
 
 func _draw_ghosts() -> void:
@@ -763,13 +916,16 @@ func _draw_right_panel() -> void:
 		var row := Rect2(x, y, w, 20)
 		_panel(row, Palette.GOLD if flash > 0.0 else (Palette.SOFT.darkened(0.4) if is_focus else Palette.PANEL_EDGE),
 				Palette.PANEL.lerp(Palette.GOLD, flash * 0.3))
-		_text(tr(item.name_key), Vector2(x + 6, y + 15), S, Palette.GOLD if flash > 0.0 else Palette.TEXT)
+		var bounce := 2.0 * sin(clampf(flash / 0.6, 0.0, 1.0) * PI)
+		Icons.draw(self, item.id, Rect2(x + 2, y + 2 - bounce, 16, 16))
+		_text(tr(item.name_key), Vector2(x + 24, y + 15), S, Palette.GOLD if flash > 0.0 else Palette.TEXT)
 		y += 22.0
 	if focused != null:
 		var box := Rect2(x, 236, w, 94)
 		_panel(box)
-		draw_multiline_string(font, Vector2(x + 8, 256), tr(focused.name_key), HORIZONTAL_ALIGNMENT_LEFT, w - 16, M, 1, Palette.GOLD)
-		draw_multiline_string(font, Vector2(x + 8, 278), tr(focused.desc_key), HORIZONTAL_ALIGNMENT_LEFT, w - 16, S, 3, Palette.SOFT)
+		Icons.draw(self, focused.id, Rect2(box.end.x - 34, box.position.y + 6, 28, 28))
+		draw_multiline_string(font, Vector2(x + 8, 256), tr(focused.name_key), HORIZONTAL_ALIGNMENT_LEFT, w - 50, M, 1, Palette.GOLD)
+		draw_multiline_string(font, Vector2(x + 8, 284), tr(focused.desc_key), HORIZONTAL_ALIGNMENT_LEFT, w - 16, S, 3, Palette.SOFT)
 
 	_text(tr("HELP_HINT"), Vector2(x, 346), S, Palette.MUTED, HORIZONTAL_ALIGNMENT_RIGHT, w)
 
@@ -791,7 +947,7 @@ func _draw_banner() -> void:
 	var a := 1.0 if p < 0.7 else 1.0 - (p - 0.7) / 0.3
 	var y := TANK_TOP + 76.0 - 10.0 * p
 	_text(banner_text, Vector2(TANK_CX - 120 + 2, y + 2), L, Color(Palette.INK, a), HORIZONTAL_ALIGNMENT_CENTER, 240)
-	_text(banner_text, Vector2(TANK_CX - 120, y), L, Color(Palette.GOLD, a), HORIZONTAL_ALIGNMENT_CENTER, 240)
+	_text(banner_text, Vector2(TANK_CX - 120, y), L, Color(banner_color, a), HORIZONTAL_ALIGNMENT_CENTER, 240)
 
 
 func _draw_end_overlay() -> void:
@@ -805,7 +961,10 @@ func _draw_end_overlay() -> void:
 	var won := room.state == Room.State.WON
 	_panel(r, Palette.GOLD if won else Palette.BAD)
 	var c := HORIZONTAL_ALIGNMENT_CENTER
-	_text(tr("ROOM_CLEARED") if won else tr("ROOM_LOST"), Vector2(r.position.x, r.position.y + 40), L,
+	var title := tr("ROOM_LOST")
+	if won:
+		title = tr("BOSS_DEFEATED") if is_boss() else tr("ROOM_CLEARED")
+	_text(title, Vector2(r.position.x, r.position.y + 40), L,
 			Palette.GOLD if won else Palette.BAD, c, r.size.x)
 	var why := ""
 	if not won:
@@ -874,6 +1033,32 @@ func _draw_rules() -> void:
 	var blink := 0.65 + 0.35 * sin(time * 3.0)
 	_text(tr("RULES_CLOSE"), Vector2(r.position.x, r.end.y - 14), S, Color(Palette.GOLD, blink), HORIZONTAL_ALIGNMENT_CENTER, r.size.x)
 	draw_set_transform_matrix(Transform2D.IDENTITY)
+
+
+## The boss card: a red flash, the boss's face, its name and what it does.
+func _draw_boss_intro() -> void:
+	var t := overlay_t
+	draw_rect(Rect2(0, 0, 640, 360), Color(0.04, 0.0, 0.0, 0.93 * Anim.clamp01(t / 0.2)))
+	# A red flash at the very start.
+	if t < 0.25:
+		draw_rect(Rect2(0, 0, 640, 360), Color(Palette.BAD, 0.5 * (1.0 - t / 0.25)))
+	var c := HORIZONTAL_ALIGNMENT_CENTER
+	# The face grows in and keeps breathing.
+	var face := 96.0 * (0.6 + 0.4 * Anim.ease_out_back(t / 0.45)) * (1.0 + 0.03 * sin(time * 3.0))
+	Icons.draw_boss(self, Rect2(Vector2(320, 104) - Vector2(face, face) * 0.5, Vector2(face, face)), Anim.clamp01(t / 0.2))
+	# "BOSS" slams down with a little shake.
+	var slam := Anim.clamp01((t - 0.3) / 0.2)
+	if slam > 0.0:
+		var jitter := Vector2(randf_range(-2, 2), randf_range(-2, 2)) * (1.0 - slam) * 3.0
+		draw_set_transform_matrix(Anim.around(Vector2(320, 184), 1.8 - 0.8 * Anim.ease_out_cubic(slam)))
+		_text(tr("BOSS_LABEL"), Vector2(0, 196) + jitter, L, Color(Palette.BAD, slam), c, 640)
+		draw_set_transform_matrix(Transform2D.IDENTITY)
+	var a := Anim.clamp01((t - 0.55) / 0.3)
+	_text(tr("BOSS_NAME_ADVERSARY"), Vector2(0, 222), M, Color(Palette.GOLD, a), c, 640)
+	draw_multiline_string(font, Vector2(120, 252), tr("BOSS_INTRO_1"), c, 400, S, 2, Color(Palette.TEXT, a))
+	draw_multiline_string(font, Vector2(120, 280), tr("BOSS_INTRO_2") % session.strike_every, c, 400, S, 2, Color(Palette.TEXT, a))
+	var blink := 0.65 + 0.35 * sin(time * 3.0)
+	_text(tr("BOSS_FIGHT"), Vector2(0, 340), M, Color(Palette.BAD.lightened(0.2), a * blink), c, 640)
 
 
 func _mini_box(center: Vector2, value: int, outline := Color(0, 0, 0, 0)) -> void:

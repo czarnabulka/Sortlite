@@ -24,3 +24,11 @@ const ARRIVE := &"arrive"
 const OVERFLOW := &"overflow"
 ## An item did something the player should see now. data: room, id.
 const ITEM_TRIGGERED := &"item_triggered"
+## A boss warns which pair it will hit next. data: room, uids, index.
+const BOSS_AIM := &"boss_aim"
+## A boss hit. data: room, index (the lower element of the swapped pair).
+const BOSS_STRIKE := &"boss_strike"
+## The aimed pair moved away in time. data: room.
+const BOSS_DODGED := &"boss_dodged"
+## A boss reached its second phase (half of the target scored). data: room.
+const BOSS_ENRAGED := &"boss_enraged"

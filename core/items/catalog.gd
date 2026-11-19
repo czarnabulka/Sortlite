@@ -8,6 +8,7 @@ extends RefCounted
 const IDS: Array[StringName] = [
 	&"sieve", &"bubble_pump", &"doubler", &"warm_cache", &"parity_bit",
 	&"fibonacci_spiral", &"power_tower", &"chain_reactor", &"fuse", &"binary_search",
+	&"express_lane",
 ]
 
 
@@ -23,13 +24,15 @@ static func make(id: StringName) -> Item:
 		&"chain_reactor": return chain_reactor()
 		&"fuse": return fuse()
 		&"binary_search": return binary_search()
+		&"express_lane": return express_lane()
 	push_error("ItemCatalog: unknown id '%s'" % id)
 	return null
 
 
-static func _ping(data: Dictionary, id: StringName) -> void:
+## `label` is a translation key the screen shows over the item (optional).
+static func _ping(data: Dictionary, id: StringName, label := "") -> void:
 	var room: Room = data["room"]
-	room.bus.emit(Events.ITEM_TRIGGERED, {"room": room, "id": id})
+	room.bus.emit(Events.ITEM_TRIGGERED, {"room": room, "id": id, "label": label})
 
 
 ## Every surfacing that is link 3 or later of a chain: +2 mult.
@@ -38,8 +41,7 @@ static func bubble_pump() -> Item:
 		.react(Events.SURFACE, func(data: Dictionary) -> void:
 			var ctx: ScoreContext = data["ctx"]
 			if ctx.chain >= 3:
-				ctx.mult += 2
-				ctx.notes.append(&"bubble_pump"))
+				ctx.apply(&"bubble_pump", ScoreContext.MULT, 2))
 
 
 ## A prime that surfaces adds its own value to the mult.
@@ -48,8 +50,7 @@ static func sieve() -> Item:
 		.react(Events.SURFACE, func(data: Dictionary) -> void:
 			var ctx: ScoreContext = data["ctx"]
 			if NumberProps.is_prime(ctx.element.value):
-				ctx.mult += ctx.element.value
-				ctx.notes.append(&"sieve"))
+				ctx.apply(&"sieve", ScoreContext.MULT, ctx.element.value))
 
 
 ## Doubles the mult of every surfacing. Order against other items matters:
@@ -58,8 +59,7 @@ static func doubler() -> Item:
 	return Item.new(&"doubler", [Events.SURFACE]) \
 		.react(Events.SURFACE, func(data: Dictionary) -> void:
 			var ctx: ScoreContext = data["ctx"]
-			ctx.mult *= 2
-			ctx.notes.append(&"doubler"))
+			ctx.apply(&"doubler", ScoreContext.XMULT, 2))
 
 
 ## An even number that surfaces: +20 points.
@@ -68,8 +68,7 @@ static func parity_bit() -> Item:
 		.react(Events.SURFACE, func(data: Dictionary) -> void:
 			var ctx: ScoreContext = data["ctx"]
 			if ctx.element.value % 2 == 0:
-				ctx.points += 20
-				ctx.notes.append(&"parity_bit"))
+				ctx.apply(&"parity_bit", ScoreContext.POINTS, 20))
 
 
 ## A Fibonacci number that surfaces: +3 mult.
@@ -78,8 +77,7 @@ static func fibonacci_spiral() -> Item:
 		.react(Events.SURFACE, func(data: Dictionary) -> void:
 			var ctx: ScoreContext = data["ctx"]
 			if NumberProps.is_fibonacci(ctx.element.value):
-				ctx.mult += 3
-				ctx.notes.append(&"fibonacci_spiral"))
+				ctx.apply(&"fibonacci_spiral", ScoreContext.MULT, 3))
 
 
 ## A power of two that surfaces: its points ×2.
@@ -88,8 +86,7 @@ static func power_tower() -> Item:
 		.react(Events.SURFACE, func(data: Dictionary) -> void:
 			var ctx: ScoreContext = data["ctx"]
 			if NumberProps.is_pow2(ctx.element.value):
-				ctx.points *= 2
-				ctx.notes.append(&"power_tower"))
+				ctx.apply(&"power_tower", ScoreContext.XPOINTS, 2))
 
 
 ## A chain of 4 or more gives 1 move back.
@@ -99,7 +96,7 @@ static func chain_reactor() -> Item:
 			if int(data["length"]) >= 4:
 				var room: Room = data["room"]
 				room.budget += 1
-				_ping(data, &"chain_reactor"))
+				_ping(data, &"chain_reactor", "FX_MOVE_BACK"))
 
 
 ## The first overflow in each room costs no life.
@@ -112,7 +109,7 @@ static func fuse() -> Item:
 		if not blown[0] and not data["absorbed"]:
 			data["absorbed"] = true
 			blown[0] = true
-			_ping(data, &"fuse"))
+			_ping(data, &"fuse", "FX_SAVED"))
 	return item
 
 
@@ -124,7 +121,7 @@ static func binary_search() -> Item:
 			if ctx.move.get("type") == Events.INSERT and ctx.cost > 2:
 				ctx.cost = 2
 				ctx.notes.append(&"binary_search")
-				_ping(data, &"binary_search"))
+				_ping(data, &"binary_search", "FX_CHEAPER"))
 
 
 ## The first move of each room is free.
@@ -139,5 +136,25 @@ static func warm_cache() -> Item:
 			ctx.cost = 0
 			ctx.notes.append(&"warm_cache")
 			used[0] = true
-			_ping(data, &"warm_cache"))
+			_ping(data, &"warm_cache", "FX_FREE"))
 	return item
+
+
+## Bubble only: a correct swap that lifts the biggest number keeps carrying it
+## up for free, up to 3 more places. (Unlimited made the boss trivial.)
+static func express_lane() -> Item:
+	return Item.new(&"express_lane", [Events.SWAP]) 		.react(Events.SWAP, func(data: Dictionary) -> void:
+			if data["wrong"]:
+				return
+			var room: Room = data["room"]
+			var board := room.board
+			var j: int = int(data["move"]["index"]) + 1
+			if board.value_at(j) != board.max_value():
+				return
+			var carried := 0
+			while carried < 3 and j < board.size() - 1 and board.value_at(j) > board.value_at(j + 1):
+				board.swap(j, j + 1)
+				j += 1
+				carried += 1
+			if carried > 0:
+				_ping(data, &"express_lane", "FX_EXPRESS"))

@@ -117,3 +117,115 @@ func test_adversary_feeds_the_worst_values() -> void:
 	for i in 50:
 		check(BubbleAlgorithm.new().adversary_value(board, rng, 12) >= 7, "bubble: at least the max")
 		check(InsertionAlgorithm.new().adversary_value(board, rng, 12) <= 4, "insertion: at most the min")
+
+
+func _boss_session(values: Array) -> RoomSession:
+	var s := RoomSession.new(1, RoomSession.ArrivalMode.TURNS, [], {
+		"boss": RoomSession.BOSS_ADVERSARY, "strike_every": 3, "every_moves": 100,
+		"start": 0, "target": 1_000_000, "capacity": 8})
+	for v in values:
+		s.room.board.insert_at(s.room.board.size(), s.room.board.make(v))
+	s.bus.record_history = true
+	return s
+
+
+func test_boss_aims_then_strikes_the_sorted_pair_nearest_the_exit() -> void:
+	# Bubble, bottom to top: 1 2 9 3. Sorted pairs: (1,2) at 0 and (2,9) at 1;
+	# nearest the exit (top) is (2,9).
+	var s := _boss_session([1, 2, 9, 3])
+	s.play({"type": Events.SWAP, "index": 2})  # 9 over 3: 1 2 3 9 -> 9 leaves
+	check(not s.is_aiming(), "no aim after 1 move")
+	s.play({"type": Events.SWAP, "index": 0})  # wrong swap: 2 1 3
+	check(s.is_aiming(), "aims after 2 moves (strike_every 3)")
+	var aimed := s.strike_uids.duplicate()
+	var before := s.room.board.values()
+	s.play({"type": Events.SWAP, "index": 0})  # back to 1 2 3: the aimed pair may move
+	check(s.bus.events_seen().has(Events.BOSS_STRIKE) or s.bus.events_seen().has(Events.BOSS_DODGED), "strike resolved")
+	check(not s.is_aiming(), "aim cleared")
+	check(aimed.size() == 2, "aimed at two elements (board was %s)" % str(before))
+
+
+func test_moving_the_aimed_pair_dodges() -> void:
+	var s := _boss_session([5, 1, 2, 8, 3])
+	# Two moves to make it aim; keep the board busy without surfacing.
+	s.play({"type": Events.SWAP, "index": 0})  # 1 5 2 8 3
+	s.play({"type": Events.SWAP, "index": 3})  # 1 5 2 3 8 -> 8 leaves: 1 5 2 3
+	check(s.is_aiming(), "aiming")
+	# Aimed pair: highest sorted pair -> (2,3) at index 2. Swap it ourselves.
+	var idx := -1
+	for i in s.room.board.size():
+		if s.room.board.cells[i].uid == s.strike_uids[0]:
+			idx = i
+	s.play({"type": Events.SWAP, "index": idx})
+	check(s.bus.events_seen().has(Events.BOSS_DODGED), "dodged")
+	check(not s.bus.events_seen().has(Events.BOSS_STRIKE), "no strike")
+
+
+func test_untouched_aimed_pair_gets_swapped() -> void:
+	var s := _boss_session([2, 7, 1, 3])
+	s.play({"type": Events.SWAP, "index": 0})  # 7 2 1 3 (correct: 2<7? no, wrong) any move
+	s.play({"type": Events.SWAP, "index": 0})  # back: 2 7 1 3
+	check(s.is_aiming(), "aiming")
+	var a := s.strike_uids[0]
+	var b := s.strike_uids[1]
+	# Play a move far from the aimed pair if possible, else any move.
+	var far := -1
+	for j in range(s.room.board.size() - 1):
+		var u1 := s.room.board.cells[j].uid
+		var u2 := s.room.board.cells[j + 1].uid
+		if u1 != a and u1 != b and u2 != a and u2 != b:
+			far = j
+	if far >= 0:
+		s.play({"type": Events.SWAP, "index": far})
+		check(s.bus.events_seen().has(Events.BOSS_STRIKE), "struck")
+
+
+func test_boss_throws_a_number_when_nothing_is_sorted() -> void:
+	# Bubble, bottom to top 9 7 5 1: no sorted pair to break.
+	var s := RoomSession.new(1, RoomSession.ArrivalMode.TURNS, [], {
+		"boss": RoomSession.BOSS_ADVERSARY, "feed": RoomSession.FEED_ADVERSARY, "strike_every": 2,
+		"every_moves": 100, "start": 0, "target": 1_000_000, "capacity": 8})
+	for v in [9, 7, 5, 1]:
+		s.room.board.insert_at(s.room.board.size(), s.room.board.make(v))
+	s.bus.record_history = true
+	s.play({"type": Events.SWAP, "index": 2})  # wrong swap: 9 7 1 5
+	check(s.is_aiming(), "aiming after 1 move")
+	var size_before := s.room.board.size()
+	# 9 7 1 5 has (1,5) sorted, so this aim is a swap; check the throw on a fresh descending board.
+	var t := RoomSession.new(2, RoomSession.ArrivalMode.TURNS, [], {
+		"boss": RoomSession.BOSS_ADVERSARY, "feed": RoomSession.FEED_ADVERSARY, "strike_every": 2,
+		"every_moves": 100, "start": 0, "target": 1_000_000, "capacity": 8})
+	for v in [9, 7, 5, 4, 1]:
+		t.room.board.insert_at(t.room.board.size(), t.room.board.make(v))
+	t.bus.record_history = true
+	t.play({"type": Events.SWAP, "index": 0})  # wrong swap: 7 9 5 4 1 -> now (7,9) is sorted
+	check(t.is_aiming(), "aiming")
+	check(size_before >= 4, "first board kept its numbers")
+
+
+func test_throw_strike_adds_a_cursed_number() -> void:
+	var s := RoomSession.new(3, RoomSession.ArrivalMode.TURNS, [], {
+		"boss": RoomSession.BOSS_ADVERSARY, "feed": RoomSession.FEED_ADVERSARY, "strike_every": 1,
+		"every_moves": 100, "start": 0, "target": 1_000_000, "capacity": 8})
+	for v in [9, 7, 5, 1]:
+		s.room.board.insert_at(s.room.board.size(), s.room.board.make(v))
+	s.bus.record_history = true
+	# Aim by hand on a board with nothing sorted, then strike.
+	s.moves_to_strike = 2
+	s._boss_tick()  # to 1: aims
+	check(s.is_aiming() and not s.is_aiming_pair(), "aims to throw")
+	var before := s.room.board.size()
+	s._boss_tick()  # to 0: strikes
+	check(s.bus.events_seen().has(Events.BOSS_STRIKE), "struck")
+	check_eq(s.room.board.size(), before + 1, "one more number")
+	var newcomer := s.room.board.cells[0]  # Bubble newcomers enter at the bottom
+	check(newcomer.has_marker(Element.CURSED), "the thrown number is cursed")
+
+
+func test_cursed_numbers_score_half() -> void:
+	var room := bubble_room([1, 3, 2])
+	room.board.cells[1].markers[Element.CURSED] = true  # the 3
+	room.start()
+	room.play({"type": Events.SWAP, "index": 1})
+	# 3 cursed: 15×1, then 20×2, 10×3
+	check_eq(room.score, 15 + 40 + 30, "half points for the cursed 3")

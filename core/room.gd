@@ -99,6 +99,15 @@ func arrive_batch(values: Array[int]) -> int:
 	return overflowed
 
 
+## Something outside a move changed the board (a boss strike): let elements
+## surface and check whether the room is over.
+func refresh() -> void:
+	if state != State.PLAYING:
+		return
+	_resolve()
+	_check_end()
+
+
 ## Ends the room as lost (out of lives, or the player gives up).
 func fail() -> void:
 	if state == State.PLAYING:
@@ -120,7 +129,10 @@ func _resolve() -> void:
 	while not board.is_empty() and algorithm.can_surface(board):
 		var e := board.remove_at(algorithm.surface_index(board))
 		chain += 1
-		var ctx := ScoreContext.new(e, chain, e.value * BASE_POINTS, mini(chain, CHAIN_CAP))
+		var base := e.value * BASE_POINTS
+		if e.has_marker(Element.CURSED):
+			base /= 2
+		var ctx := ScoreContext.new(e, chain, base, mini(chain, CHAIN_CAP))
 		bus.emit(Events.SURFACE, {"room": self, "ctx": ctx})
 		var gained := ctx.total()
 		score += gained

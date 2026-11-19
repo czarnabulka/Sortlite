@@ -32,6 +32,8 @@ func _report(key: StringName, room_cfg: Dictionary, n_items: int) -> void:
 			"feed": room_cfg.get("feed", RoomSession.FEED_RANDOM),
 			"start": room_cfg.get("start", 5),
 			"every_moves": room_cfg.get("every_moves", 3),
+			"boss": room_cfg.get("boss", RoomSession.BOSS_NONE),
+			"strike_every": room_cfg.get("strike_every", 5),
 			"target": 1_000_000_000,
 		}
 		var session := RoomSession.new(s, RoomSession.ArrivalMode.TURNS, items, cfg)

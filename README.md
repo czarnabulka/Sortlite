@@ -69,6 +69,30 @@ między pokojami. Za pokój dostajesz bity (+1 za każde 5 niewydanych ruchów):
   rośnie od góry (zielona klamra), złoty klucz wstawiasz w wybrane miejsce,
   a koszt (przesunięcia) widać obok.
 
+### Boss: Adwersarz
+
+- Przed walką: czerwone ostrzeżenie na ekranie wyboru i karta bossa
+  z jego twarzą i zasadami. Pokój ma czerwony motyw, a cel to **HP bossa**,
+  które spada z każdym punktem.
+- Jego liczby są większe niż wszystko na planszy (muszą przejść przez całą
+  kolumnę) i **przeklęte**: dają połowę punktów (fioletowa ramka).
+- Co 4 ruchy **atakuje**, z ostrzeżeniem ruch wcześniej: zamienia posortowaną
+  parę najbliżej wyjścia (rusz ją pierwszy, to unik) albo, gdy nic nie jest
+  posortowane, wrzuca dodatkową liczbę.
+- Przy połowie HP wpada we **wściekłość** (faza 2): nowe liczby i ataki
+  przychodzą o ruch częściej.
+
+Bez przedmiotów bot pokonuje go w ~59% runów, z dwoma w ~78%: tu przedmioty
+naprawdę decydują.
+
+### Przedmioty
+
+11 przedmiotów, każdy z pikselową ikoną (`ui/icons.gd`, rysowane kodem).
+Gdy przedmiot działa, nad jego wierszem wyskakuje, co dodał (`+3` do mnożnika
+na czerwono, `+20` punktów na niebiesko, `×2`), a przedmioty z innym efektem
+pokazują go słowem („+1 ruch”, „darmowy ruch”). **Pas ekspresowy** zmienia
+sposób gry: podniesienie największej liczby niesie ją do 3 pól wyżej za darmo.
+
 ### Balans
 
 `sim/sim_rooms.gd` gra każdym typem pokoju z `Run.ROOMS` na 300 seedach

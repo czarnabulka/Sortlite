@@ -126,3 +126,29 @@ func test_every_catalog_item_builds() -> void:
 	for id in ItemCatalog.IDS:
 		var item := ItemCatalog.make(id)
 		check(item != null and item.id == id, "item %s" % id)
+
+
+func test_express_lane_carries_the_biggest_up_to_three_more() -> void:
+	var room := _room_with([ItemCatalog.express_lane()], [9, 1, 2, 3, 4, 5])
+	room.start()
+	room.play({"type": Events.SWAP, "index": 0})
+	# The swap lifts 9 one place, the lane three more: 1 2 3 4 9 5.
+	check_eq(room.budget, 4, "one move spent")
+	check_eq(room.board.values(), [1, 2, 3, 4, 9, 5], "carried 3 more places")
+	room.play({"type": Events.SWAP, "index": 4})
+	check(room.board.is_empty(), "then everything chains out")
+
+
+func test_score_effects_are_recorded_in_order() -> void:
+	var e := Element.new(3, 1)
+	var ctx := ScoreContext.new(e, 1, 30, 1)
+	ctx.apply(&"sieve", ScoreContext.MULT, 3)
+	ctx.apply(&"doubler", ScoreContext.XMULT, 2)
+	check_eq(ctx.mult, 8, "(1 + 3) × 2")
+	check_eq(ctx.effects.size(), 2, "two effects")
+	check_eq(ctx.effects[1]["id"], &"doubler", "order kept")
+
+
+func test_every_item_has_an_icon() -> void:
+	for id in ItemCatalog.IDS:
+		check(Icons.ITEMS.has(id), "icon for %s" % id)

@@ -7,6 +7,9 @@ var uid: int
 var value: int
 var markers: Dictionary = {}  # StringName -> Variant
 
+## Sent by a boss: scores half.
+const CURSED := &"cursed"
+
 
 func _init(p_value: int, p_uid: int) -> void:
 	value = p_value

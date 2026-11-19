@@ -75,7 +75,10 @@ func order_batch(values: Array[int]) -> Array[int]:
 	return out
 
 
-## No bigger than anything on the board: it must be shifted all the way in.
+## Smaller than everything on the board, so it must be shifted all the way in.
+## Never equal to the smallest; once the board holds 1, values just above it.
 func adversary_value(board: Board, rng: RandomNumberGenerator, vmax: int) -> int:
-	var hi := board.min_value() if not board.is_empty() else vmax / 2
-	return rng.randi_range(1, maxi(hi, 1))
+	var low := board.min_value() if not board.is_empty() else vmax / 2
+	if low <= 1:
+		return rng.randi_range(2, mini(4, vmax))
+	return rng.randi_range(1, low - 1)

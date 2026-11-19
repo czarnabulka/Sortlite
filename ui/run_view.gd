@@ -61,6 +61,11 @@ func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
 	var i := args.find("--seed")
 	new_run(int(args[i + 1]) if i >= 0 and i + 1 < args.size() else randi() % 100000)
+	# `-- --skip 3` jumps to that room (3 = the boss), for testing.
+	var k := args.find("--skip")
+	if k >= 0 and k + 1 < args.size():
+		run.cleared = clampi(int(args[k + 1]), 0, run.plan.size() - 1)
+		_show_phase()
 
 
 func new_run(seed_value: int) -> void:
@@ -255,10 +260,19 @@ func _draw_map(y: float) -> void:
 		_text(tr("ALGO_" + String(room["algorithm"]).to_upper()), Vector2(r.position.x + 8, r.position.y + 35), S, _a(Palette.MUTED, a))
 		if done and i < run.scores.size():
 			_text(str(run.scores[i]), Vector2(r.position.x, r.position.y + 18), S, _a(Palette.GOOD, a), HORIZONTAL_ALIGNMENT_RIGHT, w - 8)
+		elif kind == Run.BOSS:
+			var face := 26.0 * (1.0 + (0.08 * sin(time * 5.0) if next else 0.0))
+			Icons.draw_boss(self, Rect2(r.end.x - 8 - face, r.get_center().y - face * 0.5, face, face), a)
 
 
 func _draw_reward() -> void:
-	_text(tr("CHOOSE_ITEM"), Vector2(0, 108), M, _a(Palette.TEXT, Anim.ease_out_cubic((screen_t - 0.15) / 0.3)), HORIZONTAL_ALIGNMENT_CENTER, 640)
+	var title_a := Anim.ease_out_cubic((screen_t - 0.15) / 0.3)
+	if run.current_room()["kind"] == Run.BOSS:
+		# The last pick before the boss says so, in red.
+		var pulse := 0.75 + 0.25 * sin(time * 4.0)
+		_text(tr("NEXT_BOSS"), Vector2(0, 108), M, _a(Palette.BAD.lightened(0.15), title_a * pulse), HORIZONTAL_ALIGNMENT_CENTER, 640)
+	else:
+		_text(tr("CHOOSE_ITEM"), Vector2(0, 108), M, _a(Palette.TEXT, title_a), HORIZONTAL_ALIGNMENT_CENTER, 640)
 	var pick_p := Anim.ease_out_cubic(pick_t / PICK_DUR) if picking >= 0 else 0.0
 	for i in run.offer.size():
 		var item := run.offer[i]
@@ -279,8 +293,9 @@ func _draw_reward() -> void:
 		var edge := Palette.GOLD if sel else Palette.PANEL_EDGE
 		var fill := Palette.PANEL.lerp(Palette.GOLD, 0.06 + (0.2 * pick_p if i == picking else 0.0)) if sel else Palette.PANEL
 		_panel(r, _a(edge, a), _a(fill, a))
+		Icons.draw(self, item.id, Rect2(r.end.x - 42, r.position.y + 10, 32, 32), a)
 		draw_multiline_string(font, Vector2(r.position.x + 10, r.position.y + 24), tr(item.name_key),
-				HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 20, M, 2, _a(Palette.GOLD if sel else Palette.TEXT, a))
+				HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 62, M, 2, _a(Palette.GOLD if sel else Palette.TEXT, a))
 		draw_multiline_string(font, Vector2(r.position.x + 10, r.position.y + 64), tr(item.desc_key),
 				HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 20, S, 4, _a(Palette.SOFT, a))
 		draw_set_transform_matrix(Transform2D.IDENTITY)

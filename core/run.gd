@@ -54,7 +54,9 @@ const ROOMS := {
 	&"elite_insertion": {"kind": ELITE, "algorithm": Algorithms.INSERTION, "kind_data": DataGen.REVERSED,
 			"start": 7, "every_moves": 4, "target": 3000, "budget": 45},
 	&"boss_adversary": {"kind": BOSS, "algorithm": Algorithms.BUBBLE, "feed": RoomSession.FEED_ADVERSARY,
-			"every_moves": 4, "target": 3500, "budget": 50},
+			"boss": RoomSession.BOSS_ADVERSARY, "strike_every": 4, "start": 5, "every_moves": 4,
+			"target": 2400, "budget": 60},
+
 }
 
 
@@ -144,6 +146,8 @@ func _start_room() -> void:
 		"feed": r.get("feed", RoomSession.FEED_RANDOM),
 		"start": r.get("start", 5),
 		"every_moves": r.get("every_moves", 3),
+		"boss": r.get("boss", RoomSession.BOSS_NONE),
+		"strike_every": r.get("strike_every", 5),
 		"lives": lives,
 		"max_lives": max_lives,
 	}
