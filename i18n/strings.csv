@@ -1,0 +1,47 @@
+keys,en,pl
+ROOM_TITLE,ROOM 1 · BUBBLE,POKÓJ 1 · BUBBLE
+SCORE,SCORE,WYNIK
+MOVES,MOVES,RUCHY
+LIVES,LIVES,ŻYCIA
+BEST_CHAIN,LONGEST CHAIN,NAJDŁUŻSZY ŁAŃCUCH
+WRONG_SWAPS,WRONG SWAPS,ZŁE ZAMIANY
+ARRIVALS,ARRIVALS,DOPŁYW
+EVERY_N_MOVES,every %d moves,co %d ruchy
+EVERY_N_SEC,every %d s,co %d s
+SWITCH_TO_TIME,M: switch to time,M: zmień na czas
+SWITCH_TO_MOVES,M: switch to moves,M: zmień na ruchy
+LET_IN_NOW,F: let in now,F: wpuść teraz
+EXIT,EXIT,WYJŚCIE
+NEXT,NEXT,NASTĘPNY
+IN_N_MOVES,in %d,za %d
+WRONG_SWAP,WRONG SWAP,ZŁA ZAMIANA
+OVERFLOW,OVERFLOW! -1 LIFE,PRZELANIE! -1 ŻYCIE
+CHAIN_BANNER,CHAIN ×%d,ŁAŃCUCH ×%d
+POINTS_X_MULT,POINTS × MULT,PUNKTY × MNOŻNIK
+ITEMS,ITEMS,PRZEDMIOTY
+HELP_SELECT,W S / arrows / wheel|pick a pair,W S / strzałki / kółko|wybór pary
+HELP_SWAP,SPACE / click|swap the pair,SPACJA / klik|zamiana pary
+HELP_LET_IN,F|let the next one in now,F|wpuść następny teraz
+HELP_DEMO,D|demo (the bot plays),D|demo (bot gra sam)
+HELP_RESTART,R / N|restart / new room,R / N|od nowa / nowy pokój
+HELP_MODE,M|arrivals: moves or time,M|dopływ: ruchy albo czas
+HELP_CRT,C / F11|CRT effect / fullscreen,C / F11|efekt CRT / pełny ekran
+HELP_LANG,L|language: English,L|język: polski
+HELP_TOGGLE,H|show / hide this card,H|pokaż / ukryj tę kartę
+HELP_TITLE,CONTROLS,STEROWANIE
+HELP_HINT,H: controls,H: sterowanie
+ROOM_CLEARED,ROOM CLEARED,POKÓJ ZALICZONY
+ROOM_LOST,YOU LOST,PRZEGRANA
+OUT_OF_LIVES,out of lives,skończyły się życia
+OUT_OF_MOVES,out of moves,skończyły się ruchy
+SCORE_OF,score %d / %d,wynik %d / %d
+END_STATS,chain ×%d   wrong swaps %d   moves left %d,łańcuch ×%d   złe zamiany %d   zostało ruchów %d
+END_KEYS,R: try again     N: new room,R: jeszcze raz     N: nowy pokój
+ITEM_SIEVE_NAME,Sieve of Eratosthenes,Sito Eratostenesa
+ITEM_SIEVE_DESC,A prime that surfaces adds its own value to the mult.,Zaliczona liczba pierwsza: + jej wartość do mnożnika.
+ITEM_BUBBLE_PUMP_NAME,Bubble Pump,Bubble Pump
+ITEM_BUBBLE_PUMP_DESC,From the 3rd link of a chain: +2 mult.,Od 3. ogniwa łańcucha: +2 do mnożnika.
+ITEM_DOUBLER_NAME,Doubler,Podwajacz
+ITEM_DOUBLER_DESC,Every surfacing: mult ×2.,Mnożnik każdego zaliczenia ×2.
+ITEM_WARM_CACHE_NAME,Warm Cache,Ciepły cache
+ITEM_WARM_CACHE_DESC,The first move in a room is free.,Pierwszy ruch w pokoju nic nie kosztuje.

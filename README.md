@@ -8,7 +8,64 @@ Dokument projektowy: https://claude.ai/artifact/5ETaojyCo7PVF7KUTtAXea
 
 Silnik: **Godot 4.7**, GDScript.
 
-## Stan: etap 1 (rdzeń bez grafiki)
+## Jak zagrać
+
+Otwórz folder w Godocie i wciśnij F5, albo z wiersza poleceń:
+
+```bash
+godot --path .
+```
+
+`godot --path . -- --demo` startuje z włączonym botem, a `-- --lang pl`
+wybiera język na jedno uruchomienie.
+
+## Języki
+
+Gra jest domyślnie po angielsku, z polskim do wyboru (klawisz L, wybór
+zapisuje się w `user://settings.cfg`). Wszystkie teksty są w
+[i18n/strings.csv](i18n/strings.csv): kolumna `keys`, potem `en` i `pl`.
+Nowy tekst w grze = nowy wiersz tam i `tr("KLUCZ")` w kodzie; test
+`tests/test_i18n.gd` pilnuje, żeby każdy klucz miał oba języki, a czcionka
+wszystkie znaki. Po zmianie CSV trzeba raz uruchomić `--import`.
+
+Czcionka: Jersey 10 (OFL), zawsze ostra; tekst tylko w rozmiarach 16, 20 i 32 px
+(`S`, `M`, `L` w `ui/room_view.gd`), bo mniejsze gubią litery.
+
+| Klawisz | Akcja |
+|---------|-------|
+| W / S, strzałki, kółko myszy | wybór pary sąsiadów |
+| SPACJA, klik w wybraną parę | zamiana |
+| F | wpuść następny element teraz |
+| M | dopływ: co 3 ruchy albo co 6 s |
+| D | demo: bot gra sam |
+| R / N | ten sam pokój od nowa / nowy pokój |
+| C | efekt CRT włącz / wyłącz |
+| L | język: English / polski (zapamiętywany) |
+| H | karta sterowania |
+| F11 | pełny ekran |
+| ESC | wyjście |
+
+## Stan: etap 2 (jeden grywalny pokój)
+
+Pokój Bubble: 8 slotów, 45 ruchów, cel 5000, 3 życia, dwa przedmioty
+(Sito Eratostenesa i Bubble Pump). Gra rysuje w 640×360 i skaluje obraz
+całkowitą wielokrotnością, z shaderem CRT (`ui/crt.gdshader`).
+
+- `core/room_session.gd`: dopływ (czas albo ruchy, do porównania w grze),
+  życia, uzupełnianie trójką, gdy zostaje najwyżej jeden element.
+- `ui/main.gd`: obraz 640×360 w SubViewport, skalowanie, CRT, wejście.
+- `ui/room_view.gd`: plansza, panele, animacje (łuk przy zamianie, wypływanie
+  ogniwo po ogniwie, punkty × mnożnik, błysk aktywnego przedmiotu).
+- `sim/sim_rooms.gd`: bot gra 400 seedów, wynik do balansu celu.
+
+Wyniki symulacji (bot bez błędów, 45 ruchów, mediana): ~3800 bez przedmiotów,
+~12 000 z Sitem i Bubble Pumpem.
+
+```bash
+godot --headless --path . -s res://sim/sim_rooms.gd
+```
+
+## Rdzeń (etap 1)
 
 Logika gry to zwykłe klasy (`RefCounted`), bez scen i okna, więc da się ją
 testować i symulować.

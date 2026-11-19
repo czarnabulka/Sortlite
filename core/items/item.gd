@@ -4,8 +4,9 @@ extends RefCounted
 ## reference each other; synergies come from sharing events and number props.
 
 var id: StringName
-var display_name: String
-var description: String
+## Translation keys (i18n/strings.csv); the screen shows tr(name_key).
+var name_key: String
+var desc_key: String
 var tags: Array[StringName] = []
 var rarity := 1
 
@@ -13,10 +14,11 @@ var _handlers: Dictionary = {}  # StringName -> Callable
 var _bus: EventBus
 
 
-func _init(p_id: StringName, p_name: String, p_description: String, p_tags: Array[StringName] = []) -> void:
+func _init(p_id: StringName, p_tags: Array[StringName] = []) -> void:
 	id = p_id
-	display_name = p_name
-	description = p_description
+	var key := "ITEM_%s" % String(p_id).to_upper()
+	name_key = key + "_NAME"
+	desc_key = key + "_DESC"
 	tags = p_tags
 
 

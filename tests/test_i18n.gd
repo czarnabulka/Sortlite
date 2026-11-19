@@ -1,0 +1,77 @@
+extends TestCase
+## Every key in i18n/strings.csv has an English and a Polish text, every key
+## the code asks for exists, and the pixel font can draw every character.
+
+const CSV := "res://i18n/strings.csv"
+const FONT := "res://assets/fonts/Jersey10-Regular.ttf"
+const SOURCES: Array[String] = ["res://ui/room_view.gd", "res://ui/main.gd"]
+
+
+func _rows() -> Dictionary:
+	var rows := {}
+	var f := FileAccess.open(CSV, FileAccess.READ)
+	var header := f.get_csv_line()
+	while not f.eof_reached():
+		var line := f.get_csv_line()
+		if line.size() >= header.size() and line[0] != "":
+			rows[line[0]] = line
+	return rows
+
+
+func test_header_is_keys_en_pl() -> void:
+	var f := FileAccess.open(CSV, FileAccess.READ)
+	check_eq(f.get_csv_line(), PackedStringArray(["keys", "en", "pl"]), "header")
+
+
+func test_every_key_has_both_languages() -> void:
+	var rows := _rows()
+	check(rows.size() > 20, "table loaded")
+	for key: String in rows:
+		var row: PackedStringArray = rows[key]
+		check(row[1].strip_edges() != "", "%s: English text" % key)
+		check(row[2].strip_edges() != "", "%s: Polish text" % key)
+		check_eq(row[1].count("%d"), row[2].count("%d"), "%s: same placeholders" % key)
+
+
+func test_keys_used_in_code_exist() -> void:
+	var rows := _rows()
+	var re := RegEx.create_from_string("tr\\(\"([A-Z0-9_]+)\"\\)")
+	for path in SOURCES:
+		var text := FileAccess.get_file_as_string(path)
+		for m in re.search_all(text):
+			check(rows.has(m.get_string(1)), "%s uses missing key %s" % [path.get_file(), m.get_string(1)])
+	var help_re := RegEx.create_from_string("\"(HELP_[A-Z_]+)\"")
+	for m in help_re.search_all(FileAccess.get_file_as_string("res://ui/room_view.gd")):
+		check(rows.has(m.get_string(1)), "missing help key %s" % m.get_string(1))
+
+
+func test_every_item_has_texts() -> void:
+	var rows := _rows()
+	for item in [ItemCatalog.sieve(), ItemCatalog.bubble_pump(), ItemCatalog.doubler(), ItemCatalog.warm_cache()]:
+		check(rows.has(item.name_key), "missing %s" % item.name_key)
+		check(rows.has(item.desc_key), "missing %s" % item.desc_key)
+
+
+func test_translations_load_in_both_languages() -> void:
+	var before := TranslationServer.get_locale()
+	TranslationServer.set_locale("pl")
+	check_eq(TranslationServer.translate("LIVES"), "ŻYCIA", "Polish")
+	TranslationServer.set_locale("en")
+	check_eq(TranslationServer.translate("LIVES"), "LIVES", "English")
+	TranslationServer.set_locale(before)
+
+
+func test_font_draws_every_character() -> void:
+	var font := load(FONT) as FontFile
+	check(font != null, "font loads")
+	if font == null:
+		return
+	var rows := _rows()
+	var missing := {}
+	for key: String in rows:
+		var row: PackedStringArray = rows[key]
+		for text in [row[1], row[2]]:
+			for c in text:
+				if not font.has_char(c.unicode_at(0)):
+					missing[c] = key
+	check(missing.is_empty(), "font lacks: %s" % str(missing))

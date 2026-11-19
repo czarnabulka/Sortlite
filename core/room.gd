@@ -70,20 +70,36 @@ func play(move: Dictionary) -> bool:
 
 
 ## A new element enters. Returns false on overflow (the board was full);
-## the run decides what an overflow costs (a life, by the design doc).
+## the session decides what an overflow costs (a life, by the design doc).
 func arrive(value: int) -> bool:
+	return arrive_batch([value]) == 0
+
+
+## Several elements enter one after another, and only then does anything
+## surface (so a batch into an empty board does not score for free).
+## Returns how many did not fit.
+func arrive_batch(values: Array[int]) -> int:
 	if state != State.PLAYING:
-		return false
-	if board.is_full():
-		overflows += 1
-		bus.emit(Events.OVERFLOW, {"room": self, "value": value})
-		return false
-	var e := board.make(value)
-	board.insert_at(algorithm.arrive_index(board), e)
-	bus.emit(Events.ARRIVE, {"room": self, "element": e})
+		return values.size()
+	var overflowed := 0
+	for value in values:
+		if board.is_full():
+			overflowed += 1
+			overflows += 1
+			bus.emit(Events.OVERFLOW, {"room": self, "value": value})
+			continue
+		var e := board.make(value)
+		board.insert_at(algorithm.arrive_index(board), e)
+		bus.emit(Events.ARRIVE, {"room": self, "element": e})
 	_resolve()
 	_check_end()
-	return true
+	return overflowed
+
+
+## Ends the room as lost (out of lives, or the player gives up).
+func fail() -> void:
+	if state == State.PLAYING:
+		_finish(State.LOST)
 
 
 func affordable_moves() -> Array[Dictionary]:

@@ -8,6 +8,8 @@ var element: Element
 var chain: int
 var points: int
 var mult: int
+## Ids of the items that changed this scoring, in order (the UI flashes them).
+var notes: Array[StringName] = []
 
 
 func _init(p_element: Element, p_chain: int, p_points: int, p_mult: int) -> void:
