@@ -1,0 +1,7 @@
+# Godot cache (regenerated on import)
+.godot/
+*.tmp
+
+# OS
+Thumbs.db
+.DS_Store
