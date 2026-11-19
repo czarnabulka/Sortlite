@@ -1,15 +1,11 @@
 keys,en,pl
-ROOM_TITLE,ROOM 1 · BUBBLE,POKÓJ 1 · BUBBLE
 SCORE,SCORE,WYNIK
 MOVES,MOVES,RUCHY
 LIVES,LIVES,ŻYCIA
 BEST_CHAIN,LONGEST CHAIN,NAJDŁUŻSZY ŁAŃCUCH
-WRONG_SWAPS,WRONG SWAPS,ZŁE ZAMIANY
 ARRIVALS,ARRIVALS,DOPŁYW
 EVERY_N_MOVES,every %d moves,co %d ruchy
 EVERY_N_SEC,every %d s,co %d s
-SWITCH_TO_TIME,M: switch to time,M: zmień na czas
-SWITCH_TO_MOVES,M: switch to moves,M: zmień na ruchy
 LET_IN_NOW,F: let in now,F: wpuść teraz
 EXIT,EXIT,WYJŚCIE
 NEXT,NEXT,NASTĘPNY
@@ -19,11 +15,10 @@ OVERFLOW,OVERFLOW! -1 LIFE,PRZELANIE! -1 ŻYCIE
 CHAIN_BANNER,CHAIN ×%d,ŁAŃCUCH ×%d
 POINTS_X_MULT,POINTS × MULT,PUNKTY × MNOŻNIK
 ITEMS,ITEMS,PRZEDMIOTY
-HELP_SELECT,W S / arrows / wheel|pick a pair,W S / strzałki / kółko|wybór pary
-HELP_SWAP,SPACE / click|swap the pair,SPACJA / klik|zamiana pary
+HELP_SELECT,W S / arrows / wheel|pick a pair or a place,W S / strzałki / kółko|wybór pary albo miejsca
+HELP_SWAP,SPACE / click|swap or insert,SPACJA / klik|zamiana albo wstawienie
 HELP_LET_IN,F|let the next one in now,F|wpuść następny teraz
 HELP_DEMO,D|demo (the bot plays),D|demo (bot gra sam)
-HELP_RESTART,R / N|restart / new room,R / N|od nowa / nowy pokój
 HELP_MODE,M|arrivals: moves or time,M|dopływ: ruchy albo czas
 HELP_CRT,C / F11|CRT effect / fullscreen,C / F11|efekt CRT / pełny ekran
 HELP_LANG,L|language: English,L|język: polski
@@ -35,8 +30,7 @@ ROOM_LOST,YOU LOST,PRZEGRANA
 OUT_OF_LIVES,out of lives,skończyły się życia
 OUT_OF_MOVES,out of moves,skończyły się ruchy
 SCORE_OF,score %d / %d,wynik %d / %d
-END_STATS,chain ×%d   wrong swaps %d   moves left %d,łańcuch ×%d   złe zamiany %d   zostało ruchów %d
-END_KEYS,R: try again     N: new room,R: jeszcze raz     N: nowy pokój
+END_STATS,chain ×%d   wrong moves %d   moves left %d,łańcuch ×%d   złe ruchy %d   zostało ruchów %d
 ITEM_SIEVE_NAME,Sieve of Eratosthenes,Sito Eratostenesa
 ITEM_SIEVE_DESC,A prime that surfaces adds its own value to the mult.,Zaliczona liczba pierwsza: + jej wartość do mnożnika.
 ITEM_BUBBLE_PUMP_NAME,Bubble Pump,Bubble Pump
@@ -45,3 +39,53 @@ ITEM_DOUBLER_NAME,Doubler,Podwajacz
 ITEM_DOUBLER_DESC,Every surfacing: mult ×2.,Mnożnik każdego zaliczenia ×2.
 ITEM_WARM_CACHE_NAME,Warm Cache,Ciepły cache
 ITEM_WARM_CACHE_DESC,The first move in a room is free.,Pierwszy ruch w pokoju nic nie kosztuje.
+ITEM_PARITY_BIT_NAME,Parity Bit,Bit parzystości
+ITEM_PARITY_BIT_DESC,An even number that surfaces: +20 points.,Zaliczona liczba parzysta: +20 punktów.
+ITEM_FIBONACCI_SPIRAL_NAME,Fibonacci Spiral,Spirala Fibonacciego
+ITEM_FIBONACCI_SPIRAL_DESC,"A Fibonacci number (1, 2, 3, 5, 8...) that surfaces: +3 mult.","Zaliczona liczba Fibonacciego (1, 2, 3, 5, 8...): +3 do mnożnika."
+ITEM_POWER_TOWER_NAME,Power Tower,Wieża potęg
+ITEM_POWER_TOWER_DESC,"A power of two (1, 2, 4, 8) that surfaces: points ×2.","Zaliczona potęga dwójki (1, 2, 4, 8): punkty ×2."
+ITEM_CHAIN_REACTOR_NAME,Chain Reactor,Reaktor łańcuchowy
+ITEM_CHAIN_REACTOR_DESC,A chain of 4 or more gives 1 move back.,Łańcuch 4 lub dłuższy oddaje 1 ruch.
+ITEM_FUSE_NAME,Fuse,Bezpiecznik
+ITEM_FUSE_DESC,The first overflow in each room costs no life.,Pierwsze przelanie w każdym pokoju nie zabiera życia.
+ITEM_BINARY_SEARCH_NAME,Binary Search,Wyszukiwanie binarne
+ITEM_BINARY_SEARCH_DESC,In Insertion rooms an insert costs at most 2 moves.,W pokojach Insertion wstawienie kosztuje najwyżej 2 ruchy.
+WRONG_MOVES,WRONG MOVES,ZŁE RUCHY
+WRONG_INSERT,WRONG PLACE,ZŁE MIEJSCE
+FUSE_BLOWN,FUSE BLOWN: NO LIFE LOST,BEZPIECZNIK: ŻYCIE ZOSTAJE
+KEY,KEY,KLUCZ
+COST_N,cost %d,koszt %d
+BITS,BITS,BITY
+ROOM_N_OF,%d/%d,%d/%d
+KIND_FIGHT,FIGHT,WALKA
+KIND_ELITE,ELITE,ELITA
+KIND_BOSS,BOSS,BOSS
+ALGO_BUBBLE,Bubble Sort,Bubble Sort
+ALGO_INSERTION,Insertion Sort,Insertion Sort
+HINT_BUBBLE,Swap neighbours. The biggest leaves through the exit.,Zamieniaj sąsiadów. Największa wychodzi wyjściem.
+HINT_INSERTION,Put the gold key into the sorted top. The smallest leaves.,Wstaw złoty klucz wyżej. Najmniejsza wychodzi.
+HINT_ADVERSARY,ADVERSARY: every newcomer is the worst one.,ADWERSARZ: każdy nowy to najgorszy przypadek.
+CONTINUE,SPACE: continue,SPACJA: dalej
+NO_ITEMS,none yet,jeszcze brak
+YOUR_ITEMS,YOUR ITEMS,TWOJE PRZEDMIOTY
+CHOOSE_ITEM,CHOOSE AN ITEM FOR THE NEXT ROOM,WYBIERZ PRZEDMIOT NA NASTĘPNY POKÓJ
+REWARD_KEYS,A D / click: pick   SPACE: take   S: skip (+%d bits)   R: reroll (%d)   E: heal (%d),A D / klik: wybór   SPACJA: bierz   S: pomiń (+%d bitów)   R: losuj (%d)   E: lecz (%d)
+FLOOR_CLEARED,FLOOR CLEARED,PIĘTRO ZALICZONE
+RUN_OVER,RUN OVER,KONIEC RUNU
+ROOM_REACHED,lost in room %d of %d,przegrana w pokoju %d z %d
+TOTAL_SCORE,total score %d,łączny wynik %d
+NEW_RUN,R: new run,R: nowy run
+HELP_RULES,I|rules of this room,I|zasady tego pokoju
+RULES_CLOSE,SPACE: got it      I: show again,SPACJA: rozumiem      I: pokaż znowu
+RULES_BUBBLE_1,Pick two neighbours and press SPACE to swap them.,"Wybierz dwóch sąsiadów i wciśnij SPACJĘ, żeby ich zamienić."
+RULES_BUBBLE_2,The biggest number on the board leaves through the exit once it reaches the top.,"Największa liczba na planszy wychodzi wyjściem, gdy dotrze na górę."
+RULES_BUBBLE_3,Swap only if the lower one is bigger. Anything else is a wrong move.,"Zamieniaj tylko wtedy, gdy dolna jest większa. Inaczej to zły ruch."
+RULES_BUBBLE_4,"If the top is already sorted, several leave in a row: a chain multiplies the points.","Jeśli góra jest już posortowana, kilka wychodzi naraz: łańcuch mnoży punkty."
+RULES_INSERTION_1,The top part of the column is sorted (green line).,Górna część kolumny jest posortowana (zielona linia).
+RULES_INSERTION_2,The gold KEY is the first number below it. Pick where it goes and press SPACE.,Złoty KLUCZ to pierwsza liczba pod nią. Wybierz dla niego miejsce i wciśnij SPACJĘ.
+RULES_INSERTION_3,"Put it where it fits: smaller above, bigger below. Each number it passes costs 1 move.","Wstaw go tam, gdzie pasuje: mniejsze wyżej, większe niżej. Każda mijana liczba to 1 ruch."
+RULES_INSERTION_4,"The smallest number leaves through the exit. When the whole column is sorted, they all leave in a chain.","Najmniejsza liczba wychodzi wyjściem. Gdy cała kolumna jest posortowana, wychodzą łańcuchem."
+RULES_ADVERSARY,BOSS: every newcomer is the worst one for this algorithm.,BOSS: każdy nowy to najgorszy przypadek dla tego algorytmu.
+RULES_PIC_BUBBLE,9 is lower and bigger: swap.,9 jest niżej i większa: zamiana.
+RULES_PIC_INSERTION,4 goes between 2 and 5.,4 trafia między 2 i 5.

@@ -48,3 +48,16 @@ func can_surface(board: Board) -> bool:
 ## Newcomers enter at the bottom, so each one has to be carried up.
 func arrive_index(_board: Board) -> int:
 	return 0
+
+
+## Smallest first: each enters at the bottom, so the biggest ends lowest.
+func order_batch(values: Array[int]) -> Array[int]:
+	var out: Array[int] = values.duplicate()
+	out.sort()
+	return out
+
+
+## At least as big as everything on the board: it must cross the whole column.
+func adversary_value(board: Board, rng: RandomNumberGenerator, vmax: int) -> int:
+	var lo := board.max_value() if not board.is_empty() else vmax / 2
+	return rng.randi_range(mini(lo, vmax), vmax)

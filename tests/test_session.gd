@@ -82,3 +82,38 @@ func test_bot_only_makes_correct_swaps() -> void:
 				break
 		check_eq(s.room.wrong_moves, 0, "seed %d: wrong swaps" % seed_value)
 		check(s.room.score > 0, "seed %d: scored" % seed_value)
+
+
+func test_insertion_session_bot_clears_rooms() -> void:
+	for seed_value in 20:
+		var s := RoomSession.new(seed_value, RoomSession.ArrivalMode.TURNS, [], {"algorithm": Algorithms.INSERTION, "target": 2000})
+		s.start()
+		var guard := 0
+		while s.is_playing() and guard < 500:
+			guard += 1
+			var move := Bots.choose(s.room.algorithm, s.room.board)
+			if move.is_empty():
+				s.deliver()
+			elif not s.play(move):
+				break
+		check_eq(s.room.wrong_moves, 0, "seed %d: wrong inserts" % seed_value)
+		check(s.room.score > 0, "seed %d: scored" % seed_value)
+
+
+func test_batch_order_keeps_newcomers_unsorted() -> void:
+	var bubble := BubbleAlgorithm.new()
+	var insertion := InsertionAlgorithm.new()
+	var batch: Array[int] = [5, 1, 9]
+	# Bubble inserts each at the bottom: smallest first leaves the biggest lowest.
+	check_eq(bubble.order_batch(batch), [1, 5, 9], "bubble")
+	# Insertion appends: biggest first leaves the smallest furthest from the exit.
+	check_eq(insertion.order_batch(batch), [9, 5, 1], "insertion")
+
+
+func test_adversary_feeds_the_worst_values() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 3
+	var board := Board.new(8, [4, 7, 5])
+	for i in 50:
+		check(BubbleAlgorithm.new().adversary_value(board, rng, 12) >= 7, "bubble: at least the max")
+		check(InsertionAlgorithm.new().adversary_value(board, rng, 12) <= 4, "insertion: at most the min")

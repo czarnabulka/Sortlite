@@ -4,12 +4,12 @@ extends Control
 ## top. Input is forwarded to the game view in its own 640×360 coordinates.
 
 const BASE := Vector2i(640, 360)
-const RoomView := preload("res://ui/room_view.gd")
+const RunView := preload("res://ui/run_view.gd")
 const CrtShader := preload("res://ui/crt.gdshader")
 
 var viewport: SubViewport
 var screen: TextureRect
-var view: RoomView
+var view: RunView
 var crt: ShaderMaterial
 
 
@@ -29,7 +29,7 @@ func _ready() -> void:
 	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	add_child(viewport)
 
-	view = RoomView.new()
+	view = RunView.new()
 	viewport.add_child(view)
 
 	crt = ShaderMaterial.new()

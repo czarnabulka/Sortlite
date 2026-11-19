@@ -20,4 +20,7 @@ const SCORED := &"scored"
 ## After a chain of 2 or more surfacings. data: room, length.
 const CHAIN := &"chain"
 const ARRIVE := &"arrive"
+## A board was full. data: room, value, absorbed (a handler may set it true).
 const OVERFLOW := &"overflow"
+## An item did something the player should see now. data: room, id.
+const ITEM_TRIGGERED := &"item_triggered"

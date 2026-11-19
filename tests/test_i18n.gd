@@ -4,7 +4,7 @@ extends TestCase
 
 const CSV := "res://i18n/strings.csv"
 const FONT := "res://assets/fonts/Jersey10-Regular.ttf"
-const SOURCES: Array[String] = ["res://ui/room_view.gd", "res://ui/main.gd"]
+const SOURCES: Array[String] = ["res://ui/room_view.gd", "res://ui/run_view.gd", "res://ui/main.gd"]
 
 
 func _rows() -> Dictionary:
@@ -75,3 +75,28 @@ func test_font_draws_every_character() -> void:
 				if not font.has_char(c.unicode_at(0)):
 					missing[c] = key
 	check(missing.is_empty(), "font lacks: %s" % str(missing))
+
+
+## Keys the screens build from ids ("KIND_" + kind, "ALGO_" + id, "HINT_" + id).
+func test_built_keys_exist() -> void:
+	var rows := _rows()
+	for kind in [Run.FIGHT, Run.ELITE, Run.BOSS]:
+		check(rows.has("KIND_" + String(kind).to_upper()), "kind %s" % kind)
+	for id in Algorithms.ALL:
+		check(rows.has("ALGO_" + String(id).to_upper()), "algo %s" % id)
+		check(rows.has("HINT_" + String(id).to_upper()), "hint %s" % id)
+	for id in Algorithms.ALL:
+		for i in range(1, 5):
+			check(rows.has("RULES_%s_%d" % [String(id).to_upper(), i]), "rules %s %d" % [id, i])
+	for key in ["HINT_ADVERSARY", "WRONG_INSERT", "WRONG_SWAP", "RULES_ADVERSARY", "HELP_RULES"]:
+		check(rows.has(key), key)
+
+
+## A comma inside an unquoted text splits it into extra columns and cuts it.
+func test_every_row_has_exactly_three_columns() -> void:
+	var f := FileAccess.open(CSV, FileAccess.READ)
+	while not f.eof_reached():
+		var line := f.get_csv_line()
+		if line.size() == 1 and line[0] == "":
+			continue
+		check_eq(line.size(), 3, "row %s" % line[0])

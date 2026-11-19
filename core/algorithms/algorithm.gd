@@ -43,3 +43,13 @@ func can_surface(_board: Board) -> bool:
 ## Where a newcomer enters.
 func arrive_index(board: Board) -> int:
 	return board.size()
+
+
+## Order in which a refill batch enters, so its elements still need sorting.
+func order_batch(values: Array[int]) -> Array[int]:
+	return values
+
+
+## The newcomer that hurts most (the Adversary boss feeds these).
+func adversary_value(_board: Board, rng: RandomNumberGenerator, vmax: int) -> int:
+	return rng.randi_range(1, vmax)

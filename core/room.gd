@@ -77,16 +77,19 @@ func arrive(value: int) -> bool:
 
 ## Several elements enter one after another, and only then does anything
 ## surface (so a batch into an empty board does not score for free).
-## Returns how many did not fit.
+## Returns how many did not fit and were not absorbed by an item.
 func arrive_batch(values: Array[int]) -> int:
 	if state != State.PLAYING:
 		return values.size()
 	var overflowed := 0
 	for value in values:
 		if board.is_full():
-			overflowed += 1
 			overflows += 1
-			bus.emit(Events.OVERFLOW, {"room": self, "value": value})
+			# A handler may set data["absorbed"] = true (the Fuse item).
+			var data := {"room": self, "value": value, "absorbed": false}
+			bus.emit(Events.OVERFLOW, data)
+			if not data["absorbed"]:
+				overflowed += 1
 			continue
 		var e := board.make(value)
 		board.insert_at(algorithm.arrive_index(board), e)
@@ -135,8 +138,12 @@ func _check_end() -> void:
 		_finish(State.WON)
 	elif budget <= 0:
 		_finish(State.LOST)
-	elif not has_arrivals and affordable_moves().is_empty():
-		_finish(State.LOST)
+	elif affordable_moves().is_empty():
+		# Moves exist but none is affordable: waiting for arrivals would only
+		# overflow the board, so the room is over. A board with no moves at all
+		# (sorted, waiting for newcomers) may keep going when arrivals come.
+		if not has_arrivals or not algorithm.legal_moves(board).is_empty():
+			_finish(State.LOST)
 
 
 func _finish(new_state: State) -> void:

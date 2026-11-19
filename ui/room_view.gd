@@ -1,6 +1,15 @@
 extends Node2D
-## One Bubble room drawn at 640×360. All rules live in core/; this node draws
-## the board, animates what the event bus reports, and turns input into moves.
+## One room drawn at 640×360, for any algorithm. All rules live in core/;
+## this node draws the board, animates what the event bus reports, and turns
+## input into moves. The run screen gives it a session and listens for
+## `continue_pressed` once the room is over.
+##
+## Both algorithms use a column with the exit at the top:
+## - Bubble: index 0 is the bottom; the biggest leaves through the top.
+## - Insertion: index 0 is the top; the sorted part grows from the top, the
+##   key (first unsorted element) is inserted into it, the smallest leaves.
+
+signal continue_pressed
 
 const TANK_CX := 300.0
 const TANK_TOP := 46.0
@@ -18,13 +27,14 @@ const RISE_DUR := 0.12
 const POP_DUR := 0.24
 const CHAIN_STEP := 0.16
 const DEMO_STEP := 0.32
+## How far the Insertion key sticks out of the column.
+const KEY_PULL := 12.0
 
 ## Text sizes. Jersey 10 stays crisp at these; anything smaller loses letters.
 const S := 16
 const M := 20
 const L := 32
 
-const ROOM_CONFIG := {"target": 5000}
 const FONT_PATH := "res://assets/fonts/Jersey10-Regular.ttf"
 
 
@@ -56,24 +66,35 @@ class Floater:
 	var text := ""
 	var pos := Vector2.ZERO
 	var color := Color.WHITE
-	var size := 12
+	var size := 16
 	var t := 0.0
 	var life := 0.9
 
 
 var session: RoomSession
-var seed_value := 1
+var room_no := 1
+var room_total := 1
+var room_kind: StringName = &"fight"
+var bits := 0
 var mode := RoomSession.ArrivalMode.TURNS
 var demo := false
 var help_open := false
+## The rules card of this room's algorithm (I). Opens by itself the first
+## time an algorithm shows up in a run. The room waits while a card is open.
+var rules_open := false
+var overlay_t := 0.0
+var intro_t := 0.0
+var end_t := 0.0
 
 var selected := 0
 var hover := -1
+var focus_item: StringName = &""
 var vis: Dictionary = {}  # uid -> Vis
 var pending_arc: Dictionary = {}  # uid -> float
 var ghosts: Array[Ghost] = []
 var floaters: Array[Floater] = []
 var item_flash: Dictionary = {}  # item id -> seconds left
+var pop_line := 0
 
 var score_target := 0
 var shown_score := 0.0
@@ -82,7 +103,6 @@ var last_mult := 0
 var formula_bump := 0.0
 var shake := 0.0
 var tank_flash := 0.0
-var tank_flash_color := Palette.BAD
 var banner_text := ""
 var banner_delay := 0.0
 var banner_t := 9.0
@@ -94,110 +114,202 @@ var _style_cache: Dictionary = {}
 
 
 func _ready() -> void:
-	font = _load_pixel_font()
-	demo = OS.get_cmdline_user_args().has("--demo")
-	help_open = OS.get_cmdline_user_args().has("--controls")
-	new_room(randi() % 100000)
+	font = load_pixel_font()
 
 
-func new_room(p_seed: int) -> void:
-	seed_value = p_seed
-	session = RoomSession.new(p_seed, mode, [ItemCatalog.sieve(), ItemCatalog.bubble_pump()], ROOM_CONFIG)
+func set_session(p_session: RoomSession, p_room_no: int, p_room_total: int, p_kind: StringName, p_bits: int,
+		show_rules := false) -> void:
+	session = p_session
+	intro_t = 0.0
+	end_t = 0.0
+	overlay_t = 0.0
+	rules_open = show_rules
+	room_no = p_room_no
+	room_total = p_room_total
+	room_kind = p_kind
+	bits = p_bits
+	mode = session.mode
 	vis.clear()
 	pending_arc.clear()
 	ghosts.clear()
 	floaters.clear()
 	item_flash.clear()
-	score_target = 0
-	shown_score = 0.0
+	focus_item = session.items[0].id if not session.items.is_empty() else &""
+	score_target = session.room.score
+	shown_score = score_target
 	last_points = 0
 	last_mult = 0
 	banner_t = 9.0
-	selected = 0
+	pop_line = 0
 	var bus := session.bus
 	# Added after the items, so the screen sees the final points and mult.
 	bus.on(Events.SWAP, _on_swap)
+	bus.on(Events.INSERT, _on_insert)
 	bus.on(Events.WRONG_MOVE, _on_wrong)
 	bus.on(Events.SURFACE, _on_surface)
 	bus.on(Events.CHAIN, _on_chain)
 	bus.on(Events.OVERFLOW, _on_overflow)
-	session.start()
+	bus.on(Events.ITEM_TRIGGERED, _on_item_triggered)
+	_reset_selection()
 	_sync_visuals()
-	for v: Vis in vis.values():
-		v.t = 1.0
-		v.pos = v.to
-		v.alpha = 1.0
+	# The starting numbers rise into the column one after another, once the
+	# panels have slid in.
+	var cells := session.room.board.cells
+	for i in cells.size():
+		var v: Vis = vis[cells[i].uid]
+		v.from = v.to + Vector2(0.0, 48.0)
+		v.pos = v.from
+		v.dur = 0.32
+		v.t = -(0.22 + 0.05 * i) / v.dur
+		v.alpha = 0.0
+
+
+func is_bubble() -> bool:
+	return session.room.algorithm.id == Algorithms.BUBBLE
+
+
+func is_over() -> bool:
+	return not session.is_playing() and ghosts.is_empty()
 
 
 # --- input -----------------------------------------------------------------
 
 func handle_input(event: InputEvent, local: Vector2) -> void:
-	var size := session.room.board.size()
+	if session == null:
+		return
+	if rules_open or help_open:
+		# Any of these closes the card; nothing else happens meanwhile.
+		var close := false
+		if event is InputEventKey and event.pressed and not event.echo:
+			close = event.keycode in [KEY_SPACE, KEY_ENTER, KEY_I, KEY_H]
+		elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			close = true
+		if close:
+			rules_open = false
+			help_open = false
+		return
 	if event is InputEventKey and event.pressed:
 		var key := event as InputEventKey
+		if is_over():
+			if not key.echo and key.keycode in [KEY_SPACE, KEY_ENTER]:
+				continue_pressed.emit()
+			return
 		match key.keycode:
 			KEY_UP, KEY_W:
-				selected = mini(selected + 1, maxi(size - 2, 0))
+				_step_selection(1)
 			KEY_DOWN, KEY_S:
-				selected = maxi(selected - 1, 0)
+				_step_selection(-1)
 			KEY_SPACE, KEY_ENTER:
 				if not key.echo:
-					_swap(selected)
+					_act(selected)
 			KEY_F:
 				if not key.echo:
 					session.deliver()
+					_reset_selection()
 			KEY_D:
 				if not key.echo:
 					demo = not demo
 			KEY_H:
 				if not key.echo:
-					help_open = not help_open
+					help_open = true
+					overlay_t = 0.0
+			KEY_I:
+				if not key.echo:
+					rules_open = true
+					overlay_t = 0.0
 			KEY_M:
 				if not key.echo:
 					mode = RoomSession.ArrivalMode.TIME if mode == RoomSession.ArrivalMode.TURNS else RoomSession.ArrivalMode.TURNS
 					session.set_mode(mode)
-			KEY_R:
-				if not key.echo:
-					new_room(seed_value)
-			KEY_N:
-				if not key.echo:
-					new_room(randi() % 100000)
 	elif event is InputEventMouseMotion:
-		hover = _pair_at(local)
+		hover = _target_at(local)
+		var row := _item_row_at(local)
+		if row >= 0:
+			focus_item = session.items[row].id
 	elif event is InputEventMouseButton and event.pressed:
 		var mb := event as InputEventMouseButton
 		match mb.button_index:
 			MOUSE_BUTTON_WHEEL_UP:
-				selected = mini(selected + 1, maxi(size - 2, 0))
+				_step_selection(1)
 			MOUSE_BUTTON_WHEEL_DOWN:
-				selected = maxi(selected - 1, 0)
+				_step_selection(-1)
 			MOUSE_BUTTON_LEFT:
-				var j := _pair_at(local)
+				if is_over():
+					continue_pressed.emit()
+					return
+				var j := _target_at(local)
 				if j >= 0:
 					if j == selected:
-						_swap(j)
+						_act(j)
 					else:
 						selected = j
 
 
-func _swap(j: int) -> void:
+## +1 = towards the exit (up on screen) for both algorithms.
+func _step_selection(direction: int) -> void:
+	var lo_hi := _selection_range()
+	if lo_hi.y < lo_hi.x:
+		return
+	selected += direction if is_bubble() else -direction
+	selected = clampi(selected, lo_hi.x, lo_hi.y)
+
+
+## Bubble: pairs 0..size-2. Insertion: places 0..k-1 before the key at k.
+func _selection_range() -> Vector2i:
+	var board := session.room.board
+	if is_bubble():
+		return Vector2i(0, board.size() - 2)
+	var k := board.sorted_prefix_length()
+	if k >= board.size():
+		return Vector2i(0, -1)
+	return Vector2i(0, k - 1)
+
+
+func _reset_selection() -> void:
+	var r := _selection_range()
+	if is_bubble():
+		selected = clampi(selected, r.x, maxi(r.y, 0))
+	else:
+		selected = maxi(r.y, 0)  # nearest place: costs 1
+
+
+func _act(target: int) -> void:
 	var wrong_before := session.room.wrong_moves
-	if session.play({"type": Events.SWAP, "index": j}):
+	var move := {"type": Events.SWAP, "index": target} if is_bubble() else {"type": Events.INSERT, "to": target}
+	if not session.play(move):
+		return
+	if session.room.wrong_moves > wrong_before:
+		shake = maxf(shake, 2.0)
+	if is_bubble():
 		# After a correct swap follow the element up, so SPACE keeps carrying it.
 		if session.room.wrong_moves == wrong_before:
-			selected = j + 1
-		else:
-			shake = maxf(shake, 2.0)
+			selected = target + 1
+		var r := _selection_range()
+		selected = clampi(selected, r.x, maxi(r.y, 0))
+	else:
+		_reset_selection()
 
 
-func _pair_at(p: Vector2) -> int:
-	var size := session.room.board.size()
-	if size < 2 or absf(p.x - TANK_CX) > TANK_W * 0.5:
+func _target_at(p: Vector2) -> int:
+	var board := session.room.board
+	if absf(p.x - TANK_CX) > TANK_W * 0.5:
 		return -1
-	var j := int(roundf((_tank_bottom() - p.y) / SLOT_H)) - 1
-	if j < 0 or j > size - 2:
+	var r := _selection_range()
+	if r.y < r.x:
 		return -1
-	return j
+	var j: int
+	if is_bubble():
+		j = int(roundf((_tank_bottom() - p.y) / SLOT_H)) - 1
+	else:
+		j = int(floorf((p.y - TANK_TOP) / SLOT_H))
+	return j if j >= r.x and j <= r.y and j < board.size() else -1
+
+
+func _item_row_at(p: Vector2) -> int:
+	if p.x < PANEL_R or p.x > PANEL_R + PANEL_R_W:
+		return -1
+	var i := int(floorf((p.y - 118.0) / 22.0))
+	return i if i >= 0 and i < session.items.size() else -1
 
 
 # --- bus events --------------------------------------------------------------
@@ -209,9 +321,20 @@ func _on_swap(data: Dictionary) -> void:
 	pending_arc[cells[j + 1].uid] = 12.0
 
 
+func _on_insert(data: Dictionary) -> void:
+	var p: int = data["move"]["to"]
+	pending_arc[session.room.board.cells[p].uid] = 22.0  # the key swings out and in
+
+
 func _on_wrong(data: Dictionary) -> void:
-	var j: int = data["move"]["index"]
-	_float(tr("WRONG_SWAP"), Vector2(TANK_CX + TANK_W * 0.5 + 14, _slot_pos(j).y - 8), Palette.BAD, S)
+	var move: Dictionary = data["move"]
+	var j: int = move.get("index", move.get("to", 0))
+	if is_bubble():
+		_float(tr("WRONG_SWAP"), Vector2(TANK_CX + TANK_W * 0.5 + 14, _slot_pos(j).y - 8), Palette.BAD, S)
+	else:
+		var text := tr("WRONG_INSERT")
+		var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, M).x
+		_float(text, Vector2(TANK_CX - w * 0.5, _slot_pos(j).y + 6), Palette.BAD, M)
 
 
 func _on_surface(data: Dictionary) -> void:
@@ -219,7 +342,7 @@ func _on_surface(data: Dictionary) -> void:
 	var g := Ghost.new()
 	g.value = ctx.element.value
 	var v: Vis = vis.get(ctx.element.uid)
-	g.start = v.pos if v != null else _slot_pos(session.room.board.size())
+	g.start = v.pos if v != null else _slot_pos(0 if not is_bubble() else session.room.board.size())
 	g.pos = g.start
 	g.chain = ctx.chain
 	g.delay = SWAP_DUR + (ctx.chain - 1) * CHAIN_STEP
@@ -238,37 +361,59 @@ func _on_chain(data: Dictionary) -> void:
 	banner_t = -1.0
 
 
-func _on_overflow(_data: Dictionary) -> void:
+func _on_overflow(data: Dictionary) -> void:
+	# The Fuse sets "absorbed" before us: it then costs nothing.
+	if data["absorbed"]:
+		_float(tr("FUSE_BLOWN"), Vector2(TANK_CX + TANK_W * 0.5 + 14, TANK_TOP + 60), Palette.GOLD, S)
+		return
 	shake = 5.0
 	tank_flash = 0.5
-	tank_flash_color = Palette.BAD
 	_float(tr("OVERFLOW"), Vector2(TANK_CX + TANK_W * 0.5 + 14, TANK_TOP + 60), Palette.BAD, S)
+
+
+func _on_item_triggered(data: Dictionary) -> void:
+	var id: StringName = data["id"]
+	item_flash[id] = 0.6
+	focus_item = id
 
 
 # --- update ------------------------------------------------------------------
 
 func _process(delta: float) -> void:
+	if session == null:
+		return
 	time += delta
-	session.update(delta)
-	if demo and session.is_playing():
+	intro_t += delta
+	overlay_t += delta
+	end_t = end_t + delta if is_over() else 0.0
+	var paused := rules_open or help_open
+	if demo and rules_open and overlay_t > 1.6:
+		rules_open = false  # the demo reads the card, then plays
+	if not paused:
+		session.update(delta)
+	if demo and session.is_playing() and not paused and intro_t > 0.6:
 		demo_timer += delta
 		if demo_timer >= DEMO_STEP:
 			demo_timer = 0.0
-			var move := BubbleBot.choose(session.room.board)
+			var move := Bots.choose_for(session.room)
 			if move.is_empty():
 				session.deliver()
+				_reset_selection()
 			else:
-				selected = move["index"]
-				_swap(move["index"])
-	selected = clampi(selected, 0, maxi(session.room.board.size() - 2, 0))
+				selected = move.get("index", move.get("to", 0))
+				_act(selected)
+	var r := _selection_range()
+	if r.y >= r.x:
+		selected = clampi(selected, r.x, r.y)
 
 	_sync_visuals()
 	for v: Vis in vis.values():
 		if v.t < 1.0:
 			v.t = minf(v.t + delta / v.dur, 1.0)
-			var e := _ease_in_out(v.t)
-			v.pos = v.from.lerp(v.to, e) + Vector2(v.arc * sin(PI * v.t), 0.0)
-		v.alpha = minf(v.alpha + delta * 5.0, 1.0)
+			var p := Anim.clamp01(v.t)
+			v.pos = v.from.lerp(v.to, _ease_in_out(p)) + Vector2(v.arc * sin(PI * p), 0.0)
+		if v.t > 0.0:  # a negative t is a delay before it starts
+			v.alpha = minf(v.alpha + delta * 5.0, 1.0)
 
 	_update_ghosts(delta)
 
@@ -278,6 +423,8 @@ func _process(delta: float) -> void:
 		if f.t < f.life:
 			kept.append(f)
 	floaters = kept
+	if floaters.is_empty():
+		pop_line = 0
 
 	for id in item_flash.keys():
 		item_flash[id] = float(item_flash[id]) - delta
@@ -357,9 +504,14 @@ func _pop(g: Ghost) -> void:
 	formula_bump = 1.0
 	for id in g.notes:
 		item_flash[id] = 0.6
-	# One line per chain link, beside the exit, so a long chain stays readable.
-	var fy := TANK_TOP + 10.0 + (g.chain - 1) * 16.0
-	_float("+%d" % g.gained, Vector2(TANK_CX + TANK_W * 0.5 + 14, fy), Palette.GOLD, S)
+		focus_item = id
+	# One line per score while earlier ones are still visible, so nothing overlaps.
+	# Bubble: right of the column. Insertion keeps that side for the key and
+	# its arrow, so its scores go on the left.
+	var fy := TANK_TOP + 10.0 + (pop_line % 9) * 16.0
+	pop_line += 1
+	var fx := TANK_CX + TANK_W * 0.5 + 14 if is_bubble() else TANK_CX - TANK_W * 0.5 - 38
+	_float("+%d" % g.gained, Vector2(fx, fy), Palette.GOLD, S)
 
 
 func _float(text: String, pos: Vector2, color: Color, size: int) -> void:
@@ -375,19 +527,29 @@ func _float(text: String, pos: Vector2, color: Color, size: int) -> void:
 
 func _draw() -> void:
 	draw_rect(Rect2(0, 0, 640, 360), Palette.BG)
+	if session == null:
+		return
 	var off := Vector2(randf_range(-shake, shake), randf_range(-shake, shake)) if shake > 0.0 else Vector2.ZERO
-	draw_set_transform(off)
+	# Side panels slide in from the edges when the room starts.
+	var slide := 1.0 - Anim.ease_out_cubic(intro_t / 0.35)
+	draw_set_transform(off + Vector2(-230.0 * slide, 0.0))
 	_draw_left_panel()
+	draw_set_transform(off + Vector2(0.0, 24.0 * slide))
 	_draw_tank()
+	draw_set_transform(off)
 	_draw_elements()
 	_draw_ghosts()
+	draw_set_transform(off + Vector2(230.0 * slide, 0.0))
 	_draw_right_panel()
+	draw_set_transform(off)
 	_draw_floaters()
 	_draw_banner()
 	draw_set_transform(Vector2.ZERO)
-	if not session.is_playing() and ghosts.is_empty():
+	if is_over():
 		_draw_end_overlay()
-	if help_open:
+	if rules_open:
+		_draw_rules()
+	elif help_open:
 		_draw_help()
 
 
@@ -396,8 +558,10 @@ func _draw_left_panel() -> void:
 	var w := 196.0
 	var room := session.room
 	var right := HORIZONTAL_ALIGNMENT_RIGHT
-	_text("ROGUESORT", Vector2(x, 22), M, Palette.GOLD)
-	_text(tr("ROOM_TITLE"), Vector2(x, 39), S, Palette.MUTED)
+	var kind_color := Palette.BAD if room_kind == Run.BOSS else Palette.GOLD
+	_text(tr("KIND_" + String(room_kind).to_upper()), Vector2(x, 22), M, kind_color)
+	_text(tr("ROOM_N_OF") % [room_no, room_total], Vector2(x, 22), M, Palette.MUTED, right, w)
+	_text(tr("ALGO_" + String(room.algorithm.id).to_upper()), Vector2(x, 39), S, Palette.SOFT)
 
 	# Score against target
 	_panel(Rect2(x, 46, w, 66))
@@ -413,46 +577,50 @@ func _draw_left_panel() -> void:
 	var low := room.budget <= 8
 	_bar(Rect2(x + 8, 146, w - 16, 4), float(room.budget) / float(session.budget_max), Palette.BAD if low else Palette.CHIPS)
 
-	# Lives
+	# Lives and bits
 	_panel(Rect2(x, 164, w, 30))
 	_text(tr("LIVES"), Vector2(x + 8, 184), S, Palette.MUTED)
 	for i in session.max_lives:
-		var r := Rect2(x + w - 8 - (session.max_lives - i) * 18, 173, 12, 12)
+		var r := Rect2(x + 62 + i * 16, 173, 11, 11)
 		if i < session.lives:
 			draw_rect(r, Palette.BAD)
 		else:
 			draw_rect(r, Palette.PANEL_EDGE, false, 1.0)
+	_text("%s %d" % [tr("BITS"), bits], Vector2(x + 8, 184), S, Palette.GOLD, right, w - 16)
 
 	# Stats
 	_panel(Rect2(x, 200, w, 50))
 	_text(tr("BEST_CHAIN"), Vector2(x + 8, 220), S, Palette.MUTED)
 	_text("×%d" % room.best_chain, Vector2(x + 8, 220), M, Palette.GOLD, right, w - 16)
-	_text(tr("WRONG_SWAPS"), Vector2(x + 8, 241), S, Palette.MUTED)
+	_text(tr("WRONG_MOVES"), Vector2(x + 8, 241), S, Palette.MUTED)
 	_text(str(room.wrong_moves), Vector2(x + 8, 241), M, Palette.BAD if room.wrong_moves > 0 else Palette.TEXT, right, w - 16)
 
-	# Arrival mode
-	_panel(Rect2(x, 256, w, 64))
+	# Arrivals
+	_panel(Rect2(x, 256, w, 46))
 	_text(tr("ARRIVALS"), Vector2(x + 8, 274), S, Palette.MUTED)
 	var how := tr("EVERY_N_MOVES") % session.every_moves if mode == RoomSession.ArrivalMode.TURNS else tr("EVERY_N_SEC") % int(session.interval_sec)
 	_text(how, Vector2(x + 8, 274), S, Palette.TEXT, right, w - 16)
-	_text(tr("SWITCH_TO_TIME") if mode == RoomSession.ArrivalMode.TURNS else tr("SWITCH_TO_MOVES"), Vector2(x + 8, 294), S, Palette.SOFT)
-	_text(tr("LET_IN_NOW"), Vector2(x + 8, 312), S, Palette.SOFT)
+	_text(tr("LET_IN_NOW"), Vector2(x + 8, 293), S, Palette.SOFT)
 
-	_text("seed %d%s" % [seed_value, "   DEMO" if demo else ""], Vector2(x, 346), S, Palette.GOLD if demo else Palette.MUTED)
+	# How this room works
+	var hint := "HINT_ADVERSARY" if session.feed == RoomSession.FEED_ADVERSARY else "HINT_" + String(room.algorithm.id).to_upper()
+	draw_multiline_string(font, Vector2(x, 320), tr(hint), HORIZONTAL_ALIGNMENT_LEFT, w, S, 2,
+			Palette.BAD.lightened(0.2) if session.feed == RoomSession.FEED_ADVERSARY else Palette.SOFT)
 
 
 func _draw_tank() -> void:
-	var cap := session.room.board.capacity
+	var board := session.room.board
+	var cap := board.capacity
 	var bottom := _tank_bottom()
 	var r := Rect2(TANK_CX - TANK_W * 0.5, TANK_TOP, TANK_W, cap * SLOT_H)
 	draw_rect(r, Palette.TANK)
 	for i in range(1, cap):
-		var y := bottom - i * SLOT_H
+		var y := TANK_TOP + i * SLOT_H
 		draw_line(Vector2(r.position.x + 4, y), Vector2(r.end.x - 4, y), Palette.SLOT_LINE, 1.0)
 	var edge := Palette.PANEL_EDGE
 	if tank_flash > 0.0:
-		edge = edge.lerp(tank_flash_color, tank_flash * 2.0)
-	elif session.room.board.is_full():
+		edge = edge.lerp(Palette.BAD, tank_flash * 2.0)
+	elif board.is_full():
 		edge = edge.lerp(Palette.BAD, 0.4 + 0.3 * sin(time * 8.0))
 	draw_rect(r, edge, false, 1.0)
 
@@ -460,22 +628,22 @@ func _draw_tank() -> void:
 	draw_dashed_line(Vector2(r.position.x - 6, TANK_TOP - 4), Vector2(r.end.x + 6, TANK_TOP - 4), Palette.GOLD.darkened(0.3), 1.0, 4.0)
 	_text(tr("EXIT"), Vector2(r.position.x, TANK_TOP - 9), S, Palette.GOLD.darkened(0.15), HORIZONTAL_ALIGNMENT_CENTER, TANK_W)
 
-	# Fill level ticks on the side
-	for i in cap:
-		var y := bottom - (i + 0.5) * SLOT_H
-		var c := Palette.GOLD if i < session.room.board.size() else Palette.PANEL_EDGE
-		draw_rect(Rect2(r.end.x + 5, y - 2, 3, 4), c)
+	# Fill level ticks on the side (Insertion uses that side for the arrow)
+	if is_bubble():
+		for i in cap:
+			var c := Palette.GOLD if i < board.size() else Palette.PANEL_EDGE
+			draw_rect(Rect2(r.end.x + 5, _slot_pos(i).y - 2, 3, 4), c)
 
-	# Pair: hover, then selection
-	if hover >= 0 and hover != selected:
-		draw_rect(_pair_rect(hover), Palette.MUTED.darkened(0.3), false, 1.0)
-	if session.room.board.size() >= 2 and session.is_playing():
-		var pr := _pair_rect(selected)
-		draw_rect(pr, Palette.GOLD, false, 1.0)
-		var mid := pr.get_center()
-		draw_colored_polygon(PackedVector2Array([
-			Vector2(pr.position.x - 9, mid.y - 5), Vector2(pr.position.x - 3, mid.y), Vector2(pr.position.x - 9, mid.y + 5)]),
-			Palette.GOLD)
+	var playing := session.is_playing()
+	if is_bubble():
+		if hover >= 0 and hover != selected:
+			draw_rect(_pair_rect(hover), Palette.MUTED.darkened(0.3), false, 1.0)
+		if board.size() >= 2 and playing:
+			var pr := _pair_rect(selected)
+			draw_rect(pr, Palette.GOLD, false, 1.0)
+			_marker(Vector2(pr.position.x, pr.get_center().y))
+	else:
+		_draw_insertion_guides(r, playing)
 
 	# Next arrival
 	var nb := Rect2(r.position.x, bottom + 5, TANK_W, 40)
@@ -489,20 +657,61 @@ func _draw_tank() -> void:
 	_bar(Rect2(nb.position.x, nb.end.y + 2, nb.size.x, 3), session.arrival_progress(), Palette.GOLD)
 
 
+## The sorted part (green bracket), the key, and where it would go.
+func _draw_insertion_guides(r: Rect2, playing: bool) -> void:
+	var board := session.room.board
+	var k := board.sorted_prefix_length()
+	if k > 0:
+		var y1 := TANK_TOP + 3.0
+		var y2 := TANK_TOP + k * SLOT_H - 3.0
+		draw_line(Vector2(r.position.x - 5, y1), Vector2(r.position.x - 5, y2), Palette.GOOD, 2.0)
+	if not playing or k >= board.size():
+		return
+	var key_pos := _slot_pos(k)
+	var v: Vis = vis.get(board.cells[k].uid)
+	if v != null:
+		key_pos = v.pos
+	if hover >= 0 and hover != selected:
+		var hy := TANK_TOP + hover * SLOT_H
+		draw_line(Vector2(r.position.x + 4, hy), Vector2(r.end.x - 4, hy), Palette.MUTED, 1.0)
+	# The gap the key would go into, and an arrow from the key to it.
+	var gy := TANK_TOP + selected * SLOT_H
+	var pulse := 0.75 + 0.25 * sin(time * 6.0)
+	draw_rect(Rect2(r.position.x + 2, gy - 1.5, TANK_W - 4, 3), Color(Palette.GOLD, pulse))
+	_marker(Vector2(r.position.x, gy))
+	_insert_arrow(key_pos.x + EL_W * 0.5 + KEY_PULL + 2.0, r.end.x - 2.0, key_pos.y, gy)
+	var lane := key_pos.x + EL_W * 0.5 + KEY_PULL + 18.0
+	_text(tr("KEY"), Vector2(lane, key_pos.y + 6), S, Palette.GOLD)
+	var cost := session.room.algorithm.move_cost(board, {"type": Events.INSERT, "to": selected})
+	_text(tr("COST_N") % cost, Vector2(lane, gy + 6), S, Palette.BAD if cost > session.room.budget else Palette.TEXT)
+
+
+func _marker(at: Vector2) -> void:
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(at.x - 9, at.y - 5), Vector2(at.x - 3, at.y), Vector2(at.x - 9, at.y + 5)]), Palette.GOLD)
+
+
 func _draw_elements() -> void:
 	var board := session.room.board
 	if board.is_empty():
 		return
-	var top := board.max_value()
-	for e in board.cells:
+	# The element that leaves next: the biggest in Bubble, the smallest in Insertion.
+	var leaver := board.max_value() if is_bubble() else board.min_value()
+	var key_index := -1 if is_bubble() else board.sorted_prefix_length()
+	for i in board.size():
+		var e := board.cells[i]
 		var v: Vis = vis.get(e.uid)
 		if v == null:
 			continue
 		var r := Rect2(v.pos - Vector2(EL_W, EL_H) * 0.5, Vector2(EL_W, EL_H))
+		if i == key_index and session.is_playing():
+			r.position.x += KEY_PULL  # the key sticks out: it is in your hand
 		var c := Palette.value_color(e.value, session.vmax)
 		c.a = v.alpha
 		_rounded(r, c, 4)
-		if e.value == top:
+		if i == key_index and session.is_playing():
+			draw_rect(r.grow(2), Palette.GOLD, false, 2.0)
+		elif e.value == leaver:
 			draw_rect(r.grow(2), Color(Palette.GOLD, 0.5 + 0.3 * sin(time * 5.0)), false, 1.0)
 		_text(str(e.value), Vector2(r.position.x, r.position.y + 20), M, Color(Palette.INK, v.alpha), HORIZONTAL_ALIGNMENT_CENTER, EL_W)
 		if NumberProps.is_prime(e.value):
@@ -540,16 +749,27 @@ func _draw_right_panel() -> void:
 	_text("×", Vector2(chips.end.x, 55), M, Palette.TEXT, HORIZONTAL_ALIGNMENT_CENTER, mult.position.x - chips.end.x)
 	_text("= %d" % (last_points * last_mult), Vector2(x, 88), M, Palette.GOLD, HORIZONTAL_ALIGNMENT_RIGHT, w)
 
-	# Items, in slot order (= effect order)
-	_text(tr("ITEMS"), Vector2(x, 112), S, Palette.MUTED)
+	# Items, one row each in slot order (= effect order), then the focused one
+	_text("%s  %d/%d" % [tr("ITEMS"), session.items.size(), Run.MAX_SLOTS], Vector2(x, 112), S, Palette.MUTED)
 	var y := 118.0
+	if session.items.is_empty():
+		_text(tr("NO_ITEMS"), Vector2(x + 8, y + 16), S, Palette.MUTED)
+	var focused: Item = null
 	for item in session.items:
 		var flash := float(item_flash.get(item.id, 0.0))
-		var r := Rect2(x, y, w, 68)
-		_panel(r, Palette.GOLD if flash > 0.0 else Palette.PANEL_EDGE, Palette.PANEL.lerp(Palette.GOLD, flash * 0.25))
-		_text(tr(item.name_key), Vector2(x + 8, y + 19), M, Palette.GOLD if flash > 0.0 else Palette.TEXT)
-		draw_multiline_string(font, Vector2(x + 8, y + 38), tr(item.desc_key), HORIZONTAL_ALIGNMENT_LEFT, w - 16, S, 2, Palette.SOFT)
-		y += 74.0
+		var is_focus := item.id == focus_item
+		if is_focus:
+			focused = item
+		var row := Rect2(x, y, w, 20)
+		_panel(row, Palette.GOLD if flash > 0.0 else (Palette.SOFT.darkened(0.4) if is_focus else Palette.PANEL_EDGE),
+				Palette.PANEL.lerp(Palette.GOLD, flash * 0.3))
+		_text(tr(item.name_key), Vector2(x + 6, y + 15), S, Palette.GOLD if flash > 0.0 else Palette.TEXT)
+		y += 22.0
+	if focused != null:
+		var box := Rect2(x, 236, w, 94)
+		_panel(box)
+		draw_multiline_string(font, Vector2(x + 8, 256), tr(focused.name_key), HORIZONTAL_ALIGNMENT_LEFT, w - 16, M, 1, Palette.GOLD)
+		draw_multiline_string(font, Vector2(x + 8, 278), tr(focused.desc_key), HORIZONTAL_ALIGNMENT_LEFT, w - 16, S, 3, Palette.SOFT)
 
 	_text(tr("HELP_HINT"), Vector2(x, 346), S, Palette.MUTED, HORIZONTAL_ALIGNMENT_RIGHT, w)
 
@@ -559,7 +779,9 @@ func _draw_floaters() -> void:
 		var p := f.t / f.life
 		var c := f.color
 		c.a = 1.0 - p * p
-		_text(f.text, f.pos + Vector2(0, -16.0 * p), f.size, c)
+		var pos := f.pos + Vector2(0, -12.0 * p)
+		_text(f.text, pos + Vector2(1, 1), f.size, Color(Palette.INK, c.a))  # shadow, readable over anything
+		_text(f.text, pos, f.size, c)
 
 
 func _draw_banner() -> void:
@@ -574,8 +796,12 @@ func _draw_banner() -> void:
 
 func _draw_end_overlay() -> void:
 	var room := session.room
-	draw_rect(Rect2(0, 0, 640, 360), Color(0, 0, 0, 0.6))
+	draw_rect(Rect2(0, 0, 640, 360), Color(0, 0, 0, 0.6 * Anim.clamp01(end_t / 0.2)))
 	var r := Rect2(140, 96, 360, 168)
+	draw_set_transform_matrix(Anim.around(r.get_center(), Anim.pop_scale(end_t - 0.05, 0.32)))
+	if end_t < 0.05:
+		draw_set_transform_matrix(Transform2D.IDENTITY)
+		return
 	var won := room.state == Room.State.WON
 	_panel(r, Palette.GOLD if won else Palette.BAD)
 	var c := HORIZONTAL_ALIGNMENT_CENTER
@@ -588,17 +814,20 @@ func _draw_end_overlay() -> void:
 	_text(tr("SCORE_OF") % [room.score, room.target], Vector2(r.position.x, r.position.y + 92), M, Palette.TEXT, c, r.size.x)
 	_text(tr("END_STATS") % [room.best_chain, room.wrong_moves, room.budget],
 			Vector2(r.position.x, r.position.y + 116), S, Palette.SOFT, c, r.size.x)
-	_text(tr("END_KEYS"), Vector2(r.position.x, r.position.y + 150), S, Palette.TEXT, c, r.size.x)
+	_text(tr("CONTINUE"), Vector2(r.position.x, r.position.y + 150), S,
+			Color(Palette.TEXT, 0.65 + 0.35 * sin(time * 3.0)), c, r.size.x)
+	draw_set_transform_matrix(Transform2D.IDENTITY)
 
 
 ## Controls card (H). Each line in the table is "keys|what they do".
 func _draw_help() -> void:
-	draw_rect(Rect2(0, 0, 640, 360), Color(0, 0, 0, 0.7))
+	draw_rect(Rect2(0, 0, 640, 360), Color(0, 0, 0, 0.7 * Anim.clamp01(overlay_t / 0.15)))
 	var lines: Array[String] = [
-		"HELP_SELECT", "HELP_SWAP", "HELP_LET_IN", "HELP_DEMO",
-		"HELP_RESTART", "HELP_MODE", "HELP_CRT", "HELP_LANG", "HELP_TOGGLE",
+		"HELP_SELECT", "HELP_SWAP", "HELP_LET_IN", "HELP_RULES", "HELP_DEMO",
+		"HELP_MODE", "HELP_CRT", "HELP_LANG", "HELP_TOGGLE",
 	]
-	var r := Rect2(110, 34, 420, 52 + lines.size() * 26)
+	var r := Rect2(110, 26, 420, 52 + lines.size() * 26)
+	draw_set_transform_matrix(Anim.around(r.get_center(), Anim.pop_scale(overlay_t)))
 	_panel(r, Palette.GOLD)
 	_text(tr("HELP_TITLE"), Vector2(r.position.x, r.position.y + 30), M, Palette.GOLD, HORIZONTAL_ALIGNMENT_CENTER, r.size.x)
 	var y := r.position.y + 62
@@ -608,6 +837,101 @@ func _draw_help() -> void:
 		if parts.size() > 1:
 			_text(parts[1], Vector2(r.position.x + 170, y), S, Palette.TEXT)
 		y += 26
+	draw_set_transform_matrix(Transform2D.IDENTITY)
+
+
+## How this room works, with a small picture: shown the first time an
+## algorithm appears in a run, and again with I.
+func _draw_rules() -> void:
+	draw_rect(Rect2(0, 0, 640, 360), Color(0, 0, 0, 0.72 * Anim.clamp01(overlay_t / 0.15)))
+	var r := Rect2(40, 24, 560, 312)
+	draw_set_transform_matrix(Anim.around(r.get_center(), Anim.pop_scale(overlay_t)))
+	_panel(r, Palette.GOLD)
+	var algo := String(session.room.algorithm.id).to_upper()
+	_text(tr("ALGO_" + algo).to_upper(), Vector2(r.position.x, r.position.y + 32), M, Palette.GOLD, HORIZONTAL_ALIGNMENT_CENTER, r.size.x)
+
+	# Picture on the left
+	if is_bubble():
+		_draw_rules_picture_bubble(Vector2(r.position.x + 24, r.position.y + 62))
+	else:
+		_draw_rules_picture_insertion(Vector2(r.position.x + 24, r.position.y + 62))
+
+	# Rules on the right, one numbered line each
+	var x := r.position.x + 196
+	var w := r.end.x - 16 - x
+	var y := r.position.y + 64
+	var keys: Array[String] = []
+	for i in range(1, 5):
+		keys.append("RULES_%s_%d" % [algo, i])
+	if session.feed == RoomSession.FEED_ADVERSARY:
+		keys.append("RULES_ADVERSARY")
+	for i in keys.size():
+		var color := Palette.BAD.lightened(0.2) if keys[i] == "RULES_ADVERSARY" else Palette.TEXT
+		_text("%d." % (i + 1), Vector2(x, y), S, Palette.GOLD)
+		draw_multiline_string(font, Vector2(x + 20, y), tr(keys[i]), HORIZONTAL_ALIGNMENT_LEFT, w - 20, S, 3, color)
+		var lines := mini(3, int(ceil(font.get_string_size(tr(keys[i]), HORIZONTAL_ALIGNMENT_LEFT, -1, S).x / (w - 20))))
+		y += 18.0 * maxi(lines, 1) + 10.0
+	var blink := 0.65 + 0.35 * sin(time * 3.0)
+	_text(tr("RULES_CLOSE"), Vector2(r.position.x, r.end.y - 14), S, Color(Palette.GOLD, blink), HORIZONTAL_ALIGNMENT_CENTER, r.size.x)
+	draw_set_transform_matrix(Transform2D.IDENTITY)
+
+
+func _mini_box(center: Vector2, value: int, outline := Color(0, 0, 0, 0)) -> void:
+	var r := Rect2(center - Vector2(28, 10), Vector2(56, 20))
+	_rounded(r, Palette.value_color(value, 12), 3)
+	if outline.a > 0.0:
+		draw_rect(r.grow(2), outline, false, 2.0)
+	_text(str(value), Vector2(r.position.x, r.position.y + 16), S, Palette.INK, HORIZONTAL_ALIGNMENT_CENTER, r.size.x)
+
+
+## Bubble: a column with the exit on top; the gold pair 9 over 2 gets swapped.
+func _draw_rules_picture_bubble(o: Vector2) -> void:
+	var cx := o.x + 60
+	draw_dashed_line(Vector2(cx - 40, o.y + 6), Vector2(cx + 40, o.y + 6), Palette.GOLD.darkened(0.3), 1.0, 4.0)
+	_text(tr("EXIT"), Vector2(cx - 40, o.y), S, Palette.GOLD.darkened(0.15), HORIZONTAL_ALIGNMENT_CENTER, 80)
+	var values := [3, 2, 9, 1]  # top to bottom
+	for i in values.size():
+		_mini_box(Vector2(cx, o.y + 26 + i * 24), values[i])
+	draw_rect(Rect2(cx - 32, o.y + 26 + 24 - 13, 64, 50), Palette.GOLD, false, 1.0)
+	_marker(Vector2(cx - 32, o.y + 26 + 36))
+	# swap arrows on the right
+	var ax := cx + 40
+	draw_line(Vector2(ax, o.y + 52), Vector2(ax, o.y + 72), Palette.GOLD, 2.0)
+	draw_colored_polygon(PackedVector2Array([Vector2(ax - 4, o.y + 54), Vector2(ax + 4, o.y + 54), Vector2(ax, o.y + 47)]), Palette.GOLD)
+	draw_colored_polygon(PackedVector2Array([Vector2(ax - 4, o.y + 70), Vector2(ax + 4, o.y + 70), Vector2(ax, o.y + 77)]), Palette.GOLD)
+	_text("9 > 2", Vector2(ax + 10, o.y + 66), S, Palette.GOLD)
+	_text(tr("RULES_PIC_BUBBLE"), Vector2(o.x, o.y + 140), S, Palette.SOFT)
+
+
+## Insertion: the sorted top (green), the gold key pulled out, and the arrow
+## to its place between 2 and 5 (it passes 8 and 5: cost 2).
+func _draw_rules_picture_insertion(o: Vector2) -> void:
+	var cx := o.x + 52
+	draw_dashed_line(Vector2(cx - 40, o.y + 6), Vector2(cx + 40, o.y + 6), Palette.GOLD.darkened(0.3), 1.0, 4.0)
+	_text(tr("EXIT"), Vector2(cx - 40, o.y), S, Palette.GOLD.darkened(0.15), HORIZONTAL_ALIGNMENT_CENTER, 80)
+	var values := [2, 5, 8]
+	for i in values.size():
+		_mini_box(Vector2(cx, o.y + 26 + i * 24), values[i])
+	draw_line(Vector2(cx - 34, o.y + 17), Vector2(cx - 34, o.y + 83), Palette.GOOD, 2.0)
+	var key_y := o.y + 26 + 3 * 24
+	_mini_box(Vector2(cx + 10, key_y), 4, Palette.GOLD)
+	_mini_box(Vector2(cx, key_y + 24), 7)
+	var gap_y := o.y + 26 + 12
+	_insert_arrow(cx + 40, cx + 30, key_y, gap_y)
+	draw_rect(Rect2(cx - 30, gap_y - 1, 60, 2), Palette.GOLD)
+	_text(tr("COST_N") % 2, Vector2(cx + 52, (key_y + gap_y) * 0.5 + 6), S, Palette.TEXT)
+	_text(tr("RULES_PIC_INSERTION"), Vector2(o.x, o.y + 164), S, Palette.SOFT)
+
+
+## An elbow arrow from the key (at key_y) up to the gap (at gap_y).
+func _insert_arrow(from_x: float, lane_x: float, key_y: float, gap_y: float) -> void:
+	var lx := maxf(from_x, lane_x) + 8.0
+	var c := Palette.GOLD
+	draw_line(Vector2(from_x, key_y), Vector2(lx, key_y), c, 2.0)
+	draw_line(Vector2(lx, key_y), Vector2(lx, gap_y), c, 2.0)
+	draw_line(Vector2(lx, gap_y), Vector2(lane_x + 6, gap_y), c, 2.0)
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(lane_x, gap_y), Vector2(lane_x + 7, gap_y - 4), Vector2(lane_x + 7, gap_y + 4)]), c)
 
 
 # --- helpers -----------------------------------------------------------------
@@ -617,7 +941,9 @@ func _tank_bottom() -> float:
 
 
 func _slot_pos(i: int) -> Vector2:
-	return Vector2(TANK_CX, _tank_bottom() - (i + 0.5) * SLOT_H)
+	if is_bubble():
+		return Vector2(TANK_CX, _tank_bottom() - (i + 0.5) * SLOT_H)
+	return Vector2(TANK_CX, TANK_TOP + (i + 0.5) * SLOT_H)
 
 
 func _pair_rect(j: int) -> Rect2:
@@ -653,7 +979,7 @@ func _rounded(r: Rect2, color: Color, radius: int) -> void:
 
 
 ## Jersey 10 (OFL, assets/fonts), drawn without smoothing: crisp at S, M and L.
-static func _load_pixel_font() -> Font:
+static func load_pixel_font() -> Font:
 	var base := load(FONT_PATH) as FontFile
 	if base == null:
 		return ThemeDB.fallback_font

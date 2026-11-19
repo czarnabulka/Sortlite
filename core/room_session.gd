@@ -9,18 +9,26 @@ extends RefCounted
 enum ArrivalMode { TIME, TURNS }
 
 ## When at most one element is left, the next arrival is a batch of three,
-## smallest first, so the biggest ends at the bottom and has to be carried up
+## ordered by the algorithm so the newcomers still have to be sorted
 ## (a lone newcomer would always surface for free). From Bubble Sort Quest.
 const BATCH_SIZE := 3
 
+## Where newcomers come from: any value, or the worst value for the
+## algorithm (the Adversary boss).
+const FEED_RANDOM := &"random"
+const FEED_ADVERSARY := &"adversary"
+
 const DEFAULTS := {
+	"algorithm": &"bubble",
 	"capacity": 8,
 	"start": 5,
 	"vmax": 12,
 	"kind": DataGen.RANDOM,
+	"feed": FEED_RANDOM,
 	"target": 2500,
 	"budget": 45,
 	"lives": 3,
+	"max_lives": -1,
 	"interval_sec": 6.0,
 	"every_moves": 3,
 }
@@ -32,6 +40,7 @@ var seed_value: int
 var items: Array[Item] = []
 var mode: ArrivalMode
 var vmax: int
+var feed: StringName
 var lives: int
 var max_lives: int
 var interval_sec: float
@@ -50,19 +59,21 @@ func _init(p_seed: int, p_mode: ArrivalMode, p_items: Array[Item] = [], config: 
 	rng.seed = p_seed
 	mode = p_mode
 	vmax = cfg["vmax"]
+	feed = cfg["feed"]
 	lives = cfg["lives"]
-	max_lives = lives
+	max_lives = lives if int(cfg["max_lives"]) < 0 else int(cfg["max_lives"])
 	interval_sec = cfg["interval_sec"]
 	every_moves = cfg["every_moves"]
 	budget_max = cfg["budget"]
 
 	bus = EventBus.new()
 	for item in p_items:
+		item.detach()  # items move from room to room with the run
 		item.attach(bus)  # slot order = effect order
 		items.append(item)
 
 	var values := DataGen.make_values(cfg["kind"], cfg["start"], vmax, rng)
-	room = Room.new(BubbleAlgorithm.new(), Board.new(cfg["capacity"], values),
+	room = Room.new(Algorithms.make(cfg["algorithm"]), Board.new(cfg["capacity"], values),
 			cfg["target"], budget_max, bus, true)
 	next_value = _roll()
 
@@ -106,14 +117,21 @@ func deliver() -> void:
 	if room.board.size() <= 1:
 		for i in BATCH_SIZE - 1:
 			batch.append(_roll())
-		batch.sort()  # smallest enters first: the biggest ends at the bottom
-	next_value = _roll()
+		batch = room.algorithm.order_batch(batch)
 	var overflowed := room.arrive_batch(batch)
+	next_value = _roll()
 	if overflowed > 0:
 		lives -= 1
 		if lives <= 0:
 			room.fail()
 	_refill_if_empty()
+
+
+## Ends the room as won or lost and detaches the items, so they can join the
+## next room's bus.
+func close() -> void:
+	for item in items:
+		item.detach()
 
 
 func set_mode(new_mode: ArrivalMode) -> void:
@@ -140,4 +158,6 @@ func _refill_if_empty() -> void:
 
 
 func _roll() -> int:
+	if feed == FEED_ADVERSARY:
+		return room.algorithm.adversary_value(room.board, rng, vmax)
 	return rng.randi_range(1, vmax)
