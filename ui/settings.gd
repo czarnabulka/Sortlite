@@ -5,6 +5,8 @@ extends RefCounted
 const PATH := "user://settings.cfg"
 const LANGUAGES: Array[String] = ["en", "pl"]
 const DEFAULT_LANGUAGE := "en"
+## Each language in its own words, so anyone can find theirs.
+const LANGUAGE_NAMES := {"en": "English", "pl": "polski"}
 
 
 static func load_language() -> String:
@@ -22,6 +24,14 @@ static func load_crt() -> bool:
 
 static func save_crt(on: bool) -> void:
 	_save("crt", on)
+
+
+static func load_fullscreen() -> bool:
+	return bool(_load("fullscreen", false))
+
+
+static func save_fullscreen(on: bool) -> void:
+	_save("fullscreen", on)
 
 
 static func load_arrival_mode() -> RoomSession.ArrivalMode:

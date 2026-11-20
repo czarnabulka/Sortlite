@@ -4,7 +4,8 @@ extends TestCase
 
 const CSV := "res://i18n/strings.csv"
 const FONT := "res://assets/fonts/Jersey10-Regular.ttf"
-const SOURCES: Array[String] = ["res://ui/room_view.gd", "res://ui/run_view.gd", "res://ui/main.gd"]
+const SOURCES: Array[String] = ["res://ui/room_view.gd", "res://ui/run_view.gd", "res://ui/main.gd",
+		"res://ui/menu_view.gd"]
 
 
 func _rows() -> Dictionary:
@@ -115,3 +116,16 @@ func test_every_row_has_exactly_three_columns() -> void:
 		if line.size() == 1 and line[0] == "":
 			continue
 		check_eq(line.size(), 3, "row %s" % line[0])
+
+
+## The menu builds its labels from a table (tr(LABELS[id])), out of reach of the
+## regex above; every row of every page needs a text.
+func test_menu_labels_exist() -> void:
+	var rows := _rows()
+	var menu := load("res://ui/menu_view.gd")
+	for page in menu.PAGES:
+		for id in menu.PAGES[page]:
+			check(menu.LABELS.has(id), "menu row %s has a label" % id)
+			check(rows.has(menu.LABELS.get(id, "")), "menu label for %s" % id)
+	for lang in Settings.LANGUAGES:
+		check(Settings.LANGUAGE_NAMES.has(lang), "name for language %s" % lang)

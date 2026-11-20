@@ -18,10 +18,6 @@ ITEMS,ITEMS,PRZEDMIOTY
 HELP_SELECT,W S / arrows / wheel|pick a pair or a place,W S / strzałki / kółko|wybór pary albo miejsca
 HELP_SWAP,SPACE / click|swap or insert,SPACJA / klik|zamiana albo wstawienie
 HELP_LET_IN,F|let the next one in now,F|wpuść następny teraz
-HELP_DEMO,D|demo (the bot plays),D|demo (bot gra sam)
-HELP_MODE,M|arrivals: moves or time,M|dopływ: ruchy albo czas
-HELP_CRT,C / F11|CRT effect / fullscreen,C / F11|efekt CRT / pełny ekran
-HELP_LANG,L|language: English,L|język: polski
 HELP_TOGGLE,H|show / hide this card,H|pokaż / ukryj tę kartę
 HELP_TITLE,CONTROLS,STEROWANIE
 HELP_HINT,H: controls,H: sterowanie
@@ -134,3 +130,25 @@ RULES_SHIP_1,Numbers that are sorted at the exit glow green. They wait there unt
 RULES_SHIP_2,"A shipment scores × its length, more for patterns: straight 4 5 6, a match 7 7, all even, all prime...","Wysyłka daje × swoją długość, więcej za wzory: strit 4 5 6, komplet 7 7, same parzyste, same pierwsze..."
 SHIPS,SHIPS,WYSYŁKI
 RULES_SHIP_3,"Shipments are few (next to your moves), and without them the room is lost: wait for long runs, but don't let the column overflow.","Wysyłek jest mało (obok ruchów), a bez nich przegrywasz pokój: czekaj na długie serie, ale nie przepełnij kolumny."
+HELP_MENU,ESC|menu: settings / quit,ESC|menu: ustawienia / wyjście
+MENU_TAGLINE,a roguelite about sorting,roguelite o sortowaniu
+MENU_PLAY,New run,Nowy run
+MENU_DEMO,Watch the bot play,Pokaz: gra bot
+MENU_SETTINGS,Settings,Ustawienia
+MENU_QUIT,Quit,Wyjdź
+MENU_RESUME,Resume,Wróć do gry
+MENU_TO_TITLE,Main menu,Menu główne
+MENU_BACK,Back,Wstecz
+MENU_PAUSED,PAUSED,PAUZA
+MENU_KEYS,W S / arrows: choose   SPACE / ENTER: confirm,W S / strzałki: wybór   SPACJA / ENTER: zatwierdź
+MENU_KEYS_PAUSE,W S: choose   SPACE / ENTER: confirm   ESC: resume,W S: wybór   SPACJA / ENTER: zatwierdź   ESC: wróć do gry
+MENU_KEYS_BACK,W S: choose   A D: change   ESC: back,W S: wybór   A D: zmiana   ESC: wstecz
+SET_TITLE,SETTINGS,USTAWIENIA
+SET_LANGUAGE,Language,Język
+SET_CRT,CRT effect,Efekt CRT
+SET_FULLSCREEN,Fullscreen,Pełny ekran
+SET_ARRIVALS,New numbers,Nowe liczby
+SET_ARRIVALS_TURNS,every few moves,co kilka ruchów
+SET_ARRIVALS_TIME,every few seconds,co kilka sekund
+SET_ON,on,wł.
+SET_OFF,off,wył.

@@ -49,14 +49,11 @@ var _fade_then: Callable
 
 func _ready() -> void:
 	font = RoomView.load_pixel_font()
-	demo = OS.get_cmdline_user_args().has("--demo")
+	demo = demo or OS.get_cmdline_user_args().has("--demo")
 	room_view = RoomView.new()
 	room_view.demo = demo
 	room_view.help_open = OS.get_cmdline_user_args().has("--controls")
 	room_view.continue_pressed.connect(func() -> void: _fade_to(_on_room_continue))
-	room_view.mode_changed.connect(func(m: RoomSession.ArrivalMode) -> void:
-		run.mode = m
-		Settings.save_arrival_mode(m))
 	add_child(room_view)
 	fader = Fader.new()
 	fader.z_index = 100
@@ -70,6 +67,13 @@ func _ready() -> void:
 	if k >= 0 and k + 1 < args.size():
 		run.cleared = clampi(int(args[k + 1]), 0, run.plan.size() - 1)
 		_show_phase()
+
+
+## Arrivals by moves or by time, from the settings: for this run and the room
+## being played.
+func set_arrival_mode(mode: RoomSession.ArrivalMode) -> void:
+	run.mode = mode
+	room_view.set_arrival_mode(mode)
 
 
 func new_run(seed_value: int) -> void:
@@ -223,6 +227,9 @@ func _process(delta: float) -> void:
 					_pick(0)
 			elif run.phase == Run.Phase.ROOM and room_view.is_over() and room_view.end_t > 1.0:
 				_fade_to(_on_room_continue)
+			elif (run.phase == Run.Phase.WON or run.phase == Run.Phase.LOST) and screen_t > 5.0:
+				# The demo keeps going: a new run after the end screen.
+				_fade_to(func() -> void: new_run(randi() % 100000))
 	if run.phase != Run.Phase.ROOM:
 		queue_redraw()
 

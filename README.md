@@ -16,14 +16,20 @@ Open the folder in Godot and press F5, or from the command line:
 godot --path .
 ```
 
-`godot --path . -- --demo` starts with the bot turned on, `-- --lang pl`
-picks the language for a single launch, `-- --seed 123` replays a run, and
-`-- --classic` plays the old rooms where sorted numbers leave by themselves.
+The game opens on the title screen ([ui/menu_view.gd](ui/menu_view.gd)): a
+new run, a demo where the bot plays, the settings, and quit. ESC during a run
+pauses it and opens the same menu over it (resume, settings, main menu, quit).
+
+For testing, `godot --path . -- --demo` starts a bot run at once (skipping the
+title, like `--seed` and `--skip`), `-- --lang pl` picks the language for a
+single launch, `-- --seed 123` replays a run, and `-- --classic` plays the old
+rooms where sorted numbers leave by themselves.
 
 ## Languages
 
-The game is in English by default, with Polish as an option (L key). The
-language, the CRT effect and the inflow mode are saved in
+The game is in English by default, with Polish as an option in the settings.
+The language, the CRT effect, fullscreen and the arrival mode (every few moves
+or every few seconds) are set in the settings and saved in
 `user://settings.cfg`. All text lives in
 [i18n/strings.csv](i18n/strings.csv): a `keys` column, then `en` and `pl`.
 New text in the game = a new row there and `tr("KEY")` in the code; the
@@ -43,14 +49,13 @@ Font: Jersey 10 (OFL), always crisp; text only at 16, 20 and 32 px
 | I | room rules card (shows up by itself in the first room of each algorithm) |
 | A / D, click | pick an item between rooms; SPACE takes it |
 | S / R / E | between rooms: skip (+bits), reroll the offer, heal a life |
-| M | inflow: every N moves or every 6 s (remembered) |
-| D | demo: the bot plays by itself |
 | R | new run (on the end screen) |
-| C | CRT effect on / off (remembered) |
-| L | language: English / polski (remembered) |
 | H | controls card |
-| F11 | fullscreen |
-| ESC | quit |
+| F11 | fullscreen (also in the settings) |
+| ESC | pause menu: resume, settings, main menu, quit |
+
+Menus: W / S or arrows to choose, SPACE / ENTER or a click to confirm,
+A / D or arrows to change a setting, ESC to go back.
 
 ## Status: stage 4 (ship rooms)
 

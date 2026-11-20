@@ -11,7 +11,6 @@ extends Node2D
 
 signal continue_pressed
 ## The player switched arrivals between moves and time (M); the run keeps it.
-signal mode_changed(new_mode: RoomSession.ArrivalMode)
 
 const TANK_CX := 300.0
 const TANK_TOP := 46.0
@@ -186,6 +185,13 @@ func set_session(p_session: RoomSession, p_room_no: int, p_room_total: int, p_ki
 		v.alpha = 0.0
 
 
+## Arrivals by moves or by time (changed in the settings).
+func set_arrival_mode(new_mode: RoomSession.ArrivalMode) -> void:
+	mode = new_mode
+	if session != null:
+		session.set_mode(new_mode)
+
+
 func is_bubble() -> bool:
 	return session.room.algorithm.id == Algorithms.BUBBLE
 
@@ -283,9 +289,6 @@ func handle_input(event: InputEvent, local: Vector2) -> void:
 			KEY_Q:
 				if not key.echo and is_ship():
 					_ship_fewer()
-			KEY_D:
-				if not key.echo:
-					demo = not demo
 			KEY_H:
 				if not key.echo:
 					help_open = true
@@ -294,11 +297,6 @@ func handle_input(event: InputEvent, local: Vector2) -> void:
 				if not key.echo:
 					rules_open = true
 					overlay_t = 0.0
-			KEY_M:
-				if not key.echo:
-					mode = RoomSession.ArrivalMode.TIME if mode == RoomSession.ArrivalMode.TURNS else RoomSession.ArrivalMode.TURNS
-					session.set_mode(mode)
-					mode_changed.emit(mode)
 	elif event is InputEventMouseMotion:
 		hover = _target_at(local)
 		var row := _item_row_at(local)
@@ -1181,8 +1179,7 @@ func _draw_end_overlay() -> void:
 func _draw_help() -> void:
 	draw_rect(Rect2(0, 0, 640, 360), Color(0, 0, 0, 0.7 * Anim.clamp01(overlay_t / 0.15)))
 	var lines: Array[String] = [
-		"HELP_SELECT", "HELP_SWAP", "HELP_LET_IN", "HELP_RULES", "HELP_DEMO",
-		"HELP_MODE", "HELP_CRT", "HELP_LANG", "HELP_TOGGLE",
+		"HELP_SELECT", "HELP_SWAP", "HELP_LET_IN", "HELP_RULES", "HELP_MENU", "HELP_TOGGLE",
 	]
 	if is_ship():
 		lines.insert(2, "HELP_SHIP")
