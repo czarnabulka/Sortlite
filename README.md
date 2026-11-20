@@ -32,6 +32,9 @@ three start a run at once. `--lang pl` picks the language for one launch, and
   Quick and the Burnt Stack. Before each room you pick 1 of 3 items (up to
   6; slot order is the order they act in). With every slot full, a new item
   replaces one you choose and takes its slot.
+- After every second room a shop sells 3 items for bits (8 each) and one
+  more shipment for the next room (5). Bits come from cleared rooms, unused
+  moves and skipped items.
 - **Bubble**: swap neighbours; the largest number is ready at the exit.
   **Insertion**: insert the gold key into the sorted part; every number it
   passes costs a move; the smallest number is ready at the exit.
@@ -74,6 +77,7 @@ three start a run at once. `--lang pl` picks the language for one launch, and
 | H | controls card |
 | A / D, click, SPACE | between rooms: pick and take an item |
 | A / D, click, SPACE, Q | slots full: choose the item to drop, replace it, Q goes back |
+| SPACE / E / R / S | in the shop: buy the card / +1 shipment / restock (2 bits) / leave |
 | S / R / E | between rooms: skip (+3 bits), reroll the offer (2 bits), heal a life (5 bits) |
 | R | new run, on the end screen |
 | F11 | fullscreen |

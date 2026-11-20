@@ -2,9 +2,10 @@ class_name Run
 extends RefCounted
 ## One run: floors of rooms, items that carry over, lives, and bits.
 ## Before every room the player picks 1 of 3 items (or skips for bits).
+## After every second room a shop sells items and extra shipments for bits.
 ## Everything is drawn from one seeded generator, so a seed replays a run.
 
-enum Phase { REWARD, ROOM, WON, LOST }
+enum Phase { REWARD, ROOM, WON, LOST, SHOP }
 
 const FIGHT := &"fight"
 const ELITE := &"elite"
@@ -16,6 +17,15 @@ const START_LIVES := 3
 const REROLL_COST := 2
 const HEAL_COST := 5
 const SKIP_BITS := 3
+## The shop opens once this many rooms are cleared (not after the last one).
+const SHOP_AFTER: Array[int] = [2, 4, 6]
+const SHOP_SIZE := 3
+## A player who buys nothing holds about 13 bits at the first shop and 37
+## at the second: an item costs more than a free pick, about one per visit.
+const ITEM_PRICE := 8
+## One more shipment in the next room (one per shop visit).
+const SHIP_PRICE := 5
+const RESTOCK_COST := 2
 ## Bits for a cleared room, plus one per BITS_PER_MOVES unused moves.
 const ROOM_BITS := {FIGHT: 3, ELITE: 5, BOSS: 6}
 const BITS_PER_MOVES := 5
@@ -34,6 +44,10 @@ var max_lives := START_LIVES
 var bits := 0
 var items: Array[Item] = []
 var offer: Array[Item] = []
+## Items for sale; a sold one becomes null.
+var shop: Array[Item] = []
+## Extra shipments bought for the next room.
+var bonus_ships := 0
 var session: RoomSession
 var scores: Array[int] = []
 
@@ -212,15 +226,65 @@ func finish_room() -> void:
 	cleared += 1
 	if cleared >= plan.size():
 		phase = Phase.WON
+	elif SHOP_AFTER.has(cleared):
+		phase = Phase.SHOP
+		_make_shop()
 	else:
 		phase = Phase.REWARD
 		_make_offer()
+
+
+# --- shop -----------------------------------------------------------------------
+
+## Buys shop item `index`. With every slot full, `replace` names the slot it
+## goes into, as in take().
+func buy_item(index: int, replace := -1) -> bool:
+	if phase != Phase.SHOP or index < 0 or index >= shop.size() or shop[index] == null or bits < ITEM_PRICE:
+		return false
+	if slots_full():
+		if replace < 0 or replace >= items.size():
+			return false
+		items[replace] = shop[index]
+	else:
+		items.append(shop[index])
+	shop[index] = null
+	bits -= ITEM_PRICE
+	return true
+
+
+## One more shipment in the next room. Once per shop visit.
+func buy_ship() -> bool:
+	if phase != Phase.SHOP or bits < SHIP_PRICE or bonus_ships > 0:
+		return false
+	bits -= SHIP_PRICE
+	bonus_ships += 1
+	return true
+
+
+func restock() -> bool:
+	if phase != Phase.SHOP or bits < RESTOCK_COST:
+		return false
+	bits -= RESTOCK_COST
+	_make_shop()
+	return true
+
+
+## On to the item pick before the next room.
+func leave_shop() -> bool:
+	if phase != Phase.SHOP:
+		return false
+	phase = Phase.REWARD
+	_make_offer()
+	return true
 
 
 func _start_room() -> void:
 	var config := session_config(current_room(), ship)
 	config["lives"] = lives
 	config["max_lives"] = max_lives
+	if int(config["ships"]) > 0:
+		config["ships"] = int(config["ships"]) + bonus_ships
+	bonus_ships = 0
 	session = RoomSession.new(rng.randi(), mode, items, config)
 	phase = Phase.ROOM
 	session.start()
@@ -249,6 +313,23 @@ static func session_config(entry: Dictionary, p_ship := false) -> Dictionary:
 
 func _make_offer() -> void:
 	offer.clear()
+	var pool := _pool()
+	for i in mini(OFFER_SIZE, pool.size()):
+		var id: StringName = pool.pop_at(rng.randi_range(0, pool.size() - 1))
+		offer.append(ItemCatalog.make(id))
+
+
+func _make_shop() -> void:
+	shop.clear()
+	var pool := _pool()
+	for i in mini(SHOP_SIZE, pool.size()):
+		var id: StringName = pool.pop_at(rng.randi_range(0, pool.size() - 1))
+		shop.append(ItemCatalog.make(id))
+
+
+## Items that may be offered or sold now: not owned, and not for an
+## algorithm with no room left ahead.
+func _pool() -> Array[StringName]:
 	var owned := {}
 	for item in items:
 		owned[item.id] = true
@@ -261,6 +342,4 @@ func _make_offer() -> void:
 		var only: StringName = ItemCatalog.make(id).algorithm
 		if not owned.has(id) and (only == &"" or ahead.has(only)):
 			pool.append(id)
-	for i in mini(OFFER_SIZE, pool.size()):
-		var id: StringName = pool.pop_at(rng.randi_range(0, pool.size() - 1))
-		offer.append(ItemCatalog.make(id))
+	return pool

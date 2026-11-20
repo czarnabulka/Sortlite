@@ -187,3 +187,7 @@ ITEM_MEDIAN_OF_THREE_NAME,Median of Three,Mediana z trzech
 ITEM_MEDIAN_OF_THREE_DESC,"Quick: a pivot that was its segment's middle value scores mult ×2.","Quick: pivot, który był środkową wartością odcinka, dostaje mnożnik ×2."
 REPLACE_TITLE,TAKING %s: CHOOSE AN ITEM TO DROP,"BIERZESZ %s: WYBIERZ, CO ODRZUCIĆ"
 REPLACE_KEYS,A D / click: item to drop   SPACE: replace   Q / right-click: back,A D / klik: co odrzucić   SPACJA: zastąp   Q / PPM: wstecz
+SHOP_TITLE,SHOP: SPEND YOUR BITS,SKLEP: WYDAJ BITY
+SHOP_SOLD,SOLD,SPRZEDANE
+SHOP_SHIP_BOUGHT,+%d shipment next room,+%d wysyłka w następnym pokoju
+SHOP_KEYS,A D / click: choose   SPACE: buy   E: +1 shipment next room (%d)   R: restock (%d)   S: leave,A D / klik: wybór   SPACJA: kup   E: +1 wysyłka (%d)   R: nowy towar (%d)   S: wyjdź

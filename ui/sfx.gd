@@ -137,6 +137,11 @@ func _add_limiter() -> void:
 func _exit_tree() -> void:
 	if _main == self:
 		_main = null
+	# Take the limiter off again, so the bus holds no effect of ours at exit.
+	var bus := AudioServer.get_bus_index(&"Master")
+	for i in range(AudioServer.get_bus_effect_count(bus) - 1, -1, -1):
+		if AudioServer.get_bus_effect(bus, i) is AudioEffectHardLimiter:
+			AudioServer.remove_bus_effect(bus, i)
 
 
 func _process(delta: float) -> void:

@@ -75,8 +75,11 @@ func test_bot_clears_floors_and_items_follow() -> void:
 	for s in 20:
 		var run := Run.new(s)
 		var guard := 0
-		while run.phase != Run.Phase.WON and run.phase != Run.Phase.LOST and guard < 20:
+		while run.phase != Run.Phase.WON and run.phase != Run.Phase.LOST and guard < 30:
 			guard += 1
+			if run.phase == Run.Phase.SHOP:
+				run.leave_shop()
+				continue
 			if run.phase == Run.Phase.REWARD and not run.take(0):
 				run.skip()
 			_play_room(run)
@@ -149,3 +152,59 @@ func test_full_slots_replace_an_item_in_its_slot() -> void:
 			check_eq(run.items[k].id, before[k], "slot %d kept" % k)
 	check(run.session.items.has(taken), "the new item is in the room")
 	check(not run.session.items.any(func(it: Item) -> bool: return it.id == before[2]), "the dropped one is not")
+
+
+func _clear_room(run: Run) -> void:
+	run.session.room.score = run.session.room.target
+	run.session.room.refresh()
+	run.finish_room()
+
+
+func test_shop_opens_after_every_second_room() -> void:
+	var run := Run.new(9)
+	run.take(0)
+	_clear_room(run)
+	check_eq(run.phase, Run.Phase.REWARD, "no shop after one room")
+	run.take(0)
+	_clear_room(run)
+	check_eq(run.phase, Run.Phase.SHOP, "a shop after two")
+	check_eq(run.shop.size(), Run.SHOP_SIZE, "three items for sale")
+	check(run.leave_shop(), "leave")
+	check_eq(run.phase, Run.Phase.REWARD, "then the item pick")
+	check_eq(run.offer.size(), Run.OFFER_SIZE, "with an offer")
+
+
+func test_shop_sells_for_bits() -> void:
+	var run := Run.new(10)
+	run.phase = Run.Phase.SHOP
+	run._make_shop()
+	run.bits = Run.ITEM_PRICE - 1
+	check(not run.buy_item(0), "not enough bits")
+	run.bits = Run.ITEM_PRICE + Run.SHIP_PRICE
+	var item := run.shop[0]
+	check(run.buy_item(0), "bought")
+	check(run.items.has(item), "item owned")
+	check(run.shop[0] == null, "sold out")
+	check(not run.buy_item(0), "a sold card cannot be bought again")
+	check(run.buy_ship(), "an extra shipment")
+	check(not run.buy_ship(), "once per visit")
+	check_eq(run.bits, 0, "paid for both")
+	run.leave_shop()
+	var ships: int = Run.session_config(run.current_room(), true)["ships"]
+	run.skip()
+	check_eq(run.session.room.ships_left, ships + 1, "the next room has one more shipment")
+	check_eq(run.bonus_ships, 0, "used up")
+
+
+func test_shop_with_full_slots_replaces_an_item() -> void:
+	var run := Run.new(11)
+	for id in ItemCatalog.IDS.slice(0, Run.MAX_SLOTS):
+		run.items.append(ItemCatalog.make(id))
+	run.phase = Run.Phase.SHOP
+	run._make_shop()
+	run.bits = 20
+	check(not run.buy_item(0), "full: must name a slot")
+	var item := run.shop[0]
+	check(run.buy_item(0, 3), "replace slot 3")
+	check_eq(run.items[3], item, "in slot 3")
+	check_eq(run.items.size(), Run.MAX_SLOTS, "still full")

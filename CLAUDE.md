@@ -71,8 +71,9 @@ not the repo.
   glyphs to cells. Check a new cell by rendering it: neighbouring cells are
   easy to mix up. `tests/test_icons.gd` checks every item has a non-empty cell.
 - `tools/shot.gd -- --items a,b,c` gives the run items; `--screen reward`
-  shows the item choice; `--seed 3` fixes the run (seed 3: floor 2 opens with
-  a Quick fight and has the Quick elite, `--room 4` / `--room 6`).
+  shows the item choice, `--screen shop` the shop (`--bits N`, `--replace`);
+  `--seed 3` fixes the run (seed 3: floor 2 opens with a Quick fight and has
+  the Quick elite, `--room 4` / `--room 6`).
 - Files use LF line endings. Python on Windows writes CRLF in text mode, so
   open files with `newline=""` (or `"\n"`) when editing them from a script.
 - Player settings are saved in `user://settings.cfg` on the user's machine.

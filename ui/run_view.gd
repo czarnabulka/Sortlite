@@ -42,6 +42,7 @@ var pick_t := 0.0
 var seen_rules: Dictionary = {}  # algorithm id -> true, per run
 ## With every slot full, taking a card first asks which item to drop:
 ## the card being taken (-1 = not asking) and the slot picked to drop.
+## In the shop the card is one for sale.
 var replacing := -1
 var drop_slot := 0
 ## The slot the card being picked goes into (-1 = a free slot).
@@ -93,7 +94,9 @@ func _show_phase() -> void:
 	picking = -1
 	card_lift = [0.0, 0.0, 0.0]
 	room_view.visible = run.phase == Run.Phase.ROOM
-	if run.phase == Run.Phase.REWARD:
+	selected_card = 0
+	replacing = -1
+	if run.phase == Run.Phase.REWARD or run.phase == Run.Phase.SHOP:
 		Sfx.play(&"deal")
 	if run.phase == Run.Phase.ROOM:
 		var algo: StringName = run.current_room()["algorithm"]
@@ -137,16 +140,19 @@ func handle_input(event: InputEvent, local: Vector2) -> void:
 			Sfx.play(&"confirm")
 			_fade_to(func() -> void: new_run(randi() % 100000))
 		return
-	# Reward phase
+	# Reward phase or shop
 	if replacing >= 0:
 		_replace_input(event, local)
+		return
+	if run.phase == Run.Phase.SHOP:
+		_shop_input(event, local)
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
 			KEY_LEFT, KEY_A:
 				_select_card(maxi(selected_card - 1, 0))
 			KEY_RIGHT, KEY_D:
-				_select_card(mini(selected_card + 1, run.offer.size() - 1))
+				_select_card(mini(selected_card + 1, _cards().size() - 1))
 			KEY_SPACE, KEY_ENTER:
 				_pick(selected_card)
 			KEY_S:
@@ -216,6 +222,54 @@ func _replace_input(event: InputEvent, local: Vector2) -> void:
 			_cancel_replace()
 
 
+## The shop: A D or the mouse choose a card, SPACE or a click buys it,
+## E buys an extra shipment, R restocks, S leaves.
+func _shop_input(event: InputEvent, local: Vector2) -> void:
+	if event is InputEventKey and event.pressed and not event.echo:
+		match event.keycode:
+			KEY_LEFT, KEY_A:
+				_select_card(maxi(selected_card - 1, 0))
+			KEY_RIGHT, KEY_D:
+				_select_card(mini(selected_card + 1, _cards().size() - 1))
+			KEY_SPACE, KEY_ENTER:
+				_buy(selected_card)
+			KEY_E:
+				Sfx.play(&"take" if run.buy_ship() else &"wrong")
+			KEY_R:
+				if run.restock():
+					screen_t = 0.15
+					Sfx.play(&"deal")
+				else:
+					Sfx.play(&"wrong")
+			KEY_S:
+				Sfx.play(&"skip")
+				_fade_to(func() -> void:
+					run.leave_shop()
+					_show_phase())
+	elif event is InputEventMouseMotion:
+		var hover := _card_at(local)
+		if hover >= 0:
+			_select_card(hover)
+	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		var i := _card_at(local)
+		if i >= 0:
+			_buy(i)
+
+
+func _buy(i: int) -> void:
+	if i < 0 or i >= run.shop.size() or run.shop[i] == null or run.bits < Run.ITEM_PRICE:
+		Sfx.play(&"wrong")
+		return
+	selected_card = i
+	if run.slots_full():
+		replacing = i
+		drop_slot = 0
+		Sfx.play(&"card_open")
+		return
+	if run.buy_item(i):
+		Sfx.play(&"take")
+
+
 func _select_drop(k: int) -> void:
 	k = clampi(k, 0, run.items.size() - 1)
 	if k != drop_slot:
@@ -225,6 +279,10 @@ func _select_drop(k: int) -> void:
 
 func _confirm_replace() -> void:
 	Sfx.play(&"take")
+	if run.phase == Run.Phase.SHOP:
+		run.buy_item(replacing, drop_slot)
+		replacing = -1
+		return
 	picking = replacing
 	pick_slot = drop_slot
 	replacing = -1
@@ -255,14 +313,20 @@ func _select_card(i: int) -> void:
 		Sfx.play(&"card_hover")
 
 
+## The cards on screen: the item offer, or what the shop sells.
+func _cards() -> Array[Item]:
+	return run.shop if run.phase == Run.Phase.SHOP else run.offer
+
+
 func _card_rect(i: int) -> Rect2:
-	var total := run.offer.size() * CARD_W + (run.offer.size() - 1) * 20.0
+	var n := _cards().size()
+	var total := n * CARD_W + (n - 1) * 20.0
 	var x0 := (640.0 - total) * 0.5
 	return Rect2(x0 + i * (CARD_W + 20.0), CARD_Y, CARD_W, CARD_H)
 
 
 func _card_at(p: Vector2) -> int:
-	for i in run.offer.size():
+	for i in _cards().size():
 		if _card_rect(i).has_point(p):
 			return i
 	return -1
@@ -299,14 +363,18 @@ func _process(delta: float) -> void:
 				_show_phase())
 
 	for i in card_lift.size():
-		var target := 6.0 if i == selected_card and run.phase == Run.Phase.REWARD else 0.0
+		var target := 6.0 if i == selected_card and (run.phase == Run.Phase.REWARD or run.phase == Run.Phase.SHOP) else 0.0
 		card_lift[i] = lerpf(card_lift[i], target, 1.0 - exp(-14.0 * delta))
 
 	if demo and not _busy():
 		demo_timer += delta
 		if demo_timer >= DEMO_PICK_SEC:
 			demo_timer = 0.0
-			if run.phase == Run.Phase.REWARD:
+			if run.phase == Run.Phase.SHOP:
+				_fade_to(func() -> void:
+					run.leave_shop()
+					_show_phase())
+			elif run.phase == Run.Phase.REWARD:
 				if run.slots_full():
 					_fade_to(func() -> void:
 						run.skip()
@@ -334,7 +402,7 @@ func _draw() -> void:
 	_text("seed %d" % run.seed_value, Vector2(16, 24), S, _a(Palette.MUTED, head), HORIZONTAL_ALIGNMENT_RIGHT, 608)
 	_draw_map(46)
 	match run.phase:
-		Run.Phase.REWARD:
+		Run.Phase.REWARD, Run.Phase.SHOP:
 			_draw_reward()
 		Run.Phase.WON, Run.Phase.LOST:
 			_draw_end()
@@ -357,7 +425,7 @@ func _draw_map(y: float) -> void:
 		if k > 0:
 			draw_line(Vector2(r.position.x - gap, r.get_center().y), Vector2(r.position.x, r.get_center().y), _a(Palette.PANEL_EDGE, a), 1.0)
 		var done := i < run.cleared
-		var next := i == run.cleared and run.phase == Run.Phase.REWARD
+		var next := i == run.cleared and (run.phase == Run.Phase.REWARD or run.phase == Run.Phase.SHOP)
 		var lost_here := i == run.cleared and run.phase == Run.Phase.LOST
 		var edge := Palette.GOLD if next else (Palette.BAD if lost_here else Palette.PANEL_EDGE)
 		if next:
@@ -378,9 +446,12 @@ func _draw_map(y: float) -> void:
 
 func _draw_reward() -> void:
 	var title_a := Anim.ease_out_cubic((screen_t - 0.15) / 0.3)
+	var shopping := run.phase == Run.Phase.SHOP
 	if replacing >= 0:
-		var taking := tr(run.offer[replacing].name_key)
+		var taking := tr(_cards()[replacing].name_key)
 		_text(tr("REPLACE_TITLE") % taking, Vector2(0, 108), M, _a(Palette.BAD.lightened(0.2), title_a), HORIZONTAL_ALIGNMENT_CENTER, 640)
+	elif shopping:
+		_text(tr("SHOP_TITLE"), Vector2(0, 108), M, _a(Palette.GOLD, title_a), HORIZONTAL_ALIGNMENT_CENTER, 640)
 	elif run.slots_full():
 		_text(tr("SLOTS_FULL"), Vector2(0, 108), M, _a(Palette.BAD.lightened(0.15), title_a), HORIZONTAL_ALIGNMENT_CENTER, 640)
 	elif run.floor_starts():
@@ -392,8 +463,9 @@ func _draw_reward() -> void:
 	else:
 		_text(tr("CHOOSE_ITEM"), Vector2(0, 108), M, _a(Palette.TEXT, title_a), HORIZONTAL_ALIGNMENT_CENTER, 640)
 	var pick_p := Anim.ease_out_cubic(pick_t / PICK_DUR) if picking >= 0 else 0.0
-	for i in run.offer.size():
-		var item := run.offer[i]
+	var cards := _cards()
+	for i in cards.size():
+		var item := cards[i]
 		var enter := Anim.stagger(screen_t, i, 0.08, 0.38)
 		var a := Anim.clamp01(enter * 2.0)
 		var r := _card_rect(i)
@@ -410,6 +482,12 @@ func _draw_reward() -> void:
 				r.position.y += 50.0 * pick_p
 				a *= 1.0 - pick_p
 		draw_set_transform_matrix(Anim.around(r.get_center(), s))
+		if item == null:
+			# Sold: an empty frame where the card was.
+			draw_rect(r, _a(Palette.PANEL_EDGE, a), false, 1.0)
+			_text(tr("SHOP_SOLD"), Vector2(r.position.x, r.get_center().y + 6), M, _a(Palette.MUTED, a), HORIZONTAL_ALIGNMENT_CENTER, r.size.x)
+			draw_set_transform_matrix(Transform2D.IDENTITY)
+			continue
 		var edge := Palette.GOLD if sel else Palette.PANEL_EDGE
 		var fill := Palette.PANEL.lerp(Palette.GOLD, 0.06 + (0.2 * pick_p if i == picking else 0.0)) if sel else Palette.PANEL
 		_panel(r, _a(edge, a), _a(fill, a))
@@ -418,6 +496,14 @@ func _draw_reward() -> void:
 				HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 62, M, 2, _a(Palette.GOLD if sel else Palette.TEXT, a))
 		draw_multiline_string(font, Vector2(r.position.x + 10, r.position.y + 64), tr(item.desc_key),
 				HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 20, S, 4, _a(Palette.SOFT, a))
+		if shopping:
+			# The price on a tag at the card's foot, red when you cannot pay it.
+			var afford := run.bits >= Run.ITEM_PRICE
+			var tag := Rect2(r.end.x - 50, r.end.y - 10, 42, 20)
+			var tc := Palette.GOLD if afford else Palette.BAD
+			_panel(tag, _a(tc, a), _a(Palette.BG, a))
+			Icons.draw_glyph(self, &"coin", Rect2(tag.position.x + 3, tag.position.y + 2, 16, 16), _a(tc, a))
+			_text(str(Run.ITEM_PRICE), Vector2(tag.position.x + 22, tag.position.y + 15), S, _a(tc, a))
 		draw_set_transform_matrix(Transform2D.IDENTITY)
 
 	# What you already have (one box per slot), lives, bits and the keys fade
@@ -445,7 +531,13 @@ func _draw_reward() -> void:
 				_a(Palette.BAD if i < run.lives else Palette.PANEL_EDGE.lightened(0.2), b))
 	Icons.draw_glyph(self, &"coin", Rect2(130, y - 13, 16, 16), _a(Palette.GOLD, b))
 	_text("%s %d" % [tr("BITS"), run.bits], Vector2(150, y), S, _a(Palette.GOLD, b))
-	var keys := tr("REPLACE_KEYS") if replacing >= 0 else tr("REWARD_KEYS") % [Run.SKIP_BITS, Run.REROLL_COST, Run.HEAL_COST]
+	if run.bonus_ships > 0:
+		_text(tr("SHOP_SHIP_BOUGHT") % run.bonus_ships, Vector2(240, y), S, _a(Palette.GOOD, b))
+	var keys := tr("REWARD_KEYS") % [Run.SKIP_BITS, Run.REROLL_COST, Run.HEAL_COST]
+	if replacing >= 0:
+		keys = tr("REPLACE_KEYS")
+	elif shopping:
+		keys = tr("SHOP_KEYS") % [Run.SHIP_PRICE, Run.RESTOCK_COST]
 	_text(keys, Vector2(16, y + 18), S, _a(Palette.TEXT, b))
 
 
