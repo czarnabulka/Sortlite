@@ -192,6 +192,21 @@ func test_every_ship_room_has_a_limit_and_classic_rooms_none() -> void:
 		check_eq(ship.ships_max, ship.room.ships_left, "%s: max for the screen" % key)
 		var classic := RoomSession.new(1, RoomSession.ArrivalMode.TURNS, [], Run.session_config(Run.ROOMS[key], false))
 		check_eq(classic.room.ships_left, -1, "%s: classic rooms have no limit" % key)
+		check_eq(ship.room.max_ship, Run.MAX_SHIP, "%s: shipments are capped" % key)
+		check_eq(classic.room.max_ship, -1, "%s: classic rooms have no cap" % key)
+
+
+func test_a_shipment_holds_at_most_max_ship() -> void:
+	var room := _ship_room([1, 2, 3, 4, 5])  # all five ready at the top
+	room.max_ship = 3
+	check_eq(room.ready_count(), 5, "five ready")
+	check_eq(room.shippable(), 3, "three may go")
+	check(not room.play({"type": Events.SHIP, "count": 4}), "four is over the cap")
+	var counts: Array = room.affordable_moves().filter(func(m: Dictionary) -> bool:
+		return m.get("type") == Events.SHIP).map(func(m: Dictionary) -> int: return m["count"])
+	check_eq(counts, [1, 2, 3], "ship moves offered up to the cap")
+	check(room.play({"type": Events.SHIP, "count": 3}), "three ship")
+	check_eq(room.board.values(), [1, 2], "the rest wait for the next shipment")
 
 
 func test_insertion_elite_ship_room_uses_duplicates() -> void:

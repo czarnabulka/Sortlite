@@ -265,9 +265,10 @@ func is_ship() -> bool:
 	return session.room.manual_ship
 
 
-## How many numbers E would ship now (0 when nothing is ready).
+## How many numbers E would ship now (0 when nothing is ready); at most
+## Room.max_ship, however long the ready run is.
 func ship_count() -> int:
-	var ready := session.room.ready_count()
+	var ready := session.room.shippable()
 	if ready == 0:
 		return 0
 	return ready if ship_n < 0 else clampi(ship_n, 1, ready)
@@ -386,7 +387,7 @@ func handle_input(event: InputEvent, local: Vector2) -> void:
 				var c := _cell_at(local)
 				if is_ship() and not is_over() and c >= 0:
 					var d := _exit_distance(c)
-					if d <= session.room.ready_count():
+					if d <= session.room.shippable():
 						if d == ship_count():
 							_ship()
 						else:
@@ -1067,6 +1068,8 @@ func _draw_ship_box(box: Rect2) -> void:
 	_text(tr("SHIP_N") % n, Vector2(x + 8, box.position.y + 20), S, Palette.TEXT)
 	_text("×%d" % int(hand["mult"]), Vector2(x + 8, box.position.y + 21), M, Palette.GOLD, right, w - 16)
 	var sub := hand_names(patterns) if not patterns.is_empty() else tr("SHIP_KEYS")
+	if patterns.is_empty() and session.room.ready_count() > session.room.shippable():
+		sub = tr("SHIP_CAP") % session.room.max_ship  # the run is longer than one shipment
 	_text(sub, Vector2(x + 8, box.position.y + 41), S, Palette.GOLD if not patterns.is_empty() else Palette.MUTED)
 
 
@@ -1516,12 +1519,17 @@ func _draw_rules() -> void:
 	for i in keys.size():
 		var color := Palette.BAD.lightened(0.2) if keys[i] == boss_rules else Palette.TEXT
 		_text("%d." % (i + 1), Vector2(x, y), S, Palette.GOLD)
-		draw_multiline_string(font, Vector2(x + 20, y), tr(keys[i]), HORIZONTAL_ALIGNMENT_LEFT, w - 20, S, 3, color)
+		draw_multiline_string(font, Vector2(x + 20, y), _rule_text(keys[i]), HORIZONTAL_ALIGNMENT_LEFT, w - 20, S, 3, color)
 		# The real wrapped height, so the next line never overlaps (wraps differ by language).
-		y += font.get_multiline_string_size(tr(keys[i]), HORIZONTAL_ALIGNMENT_LEFT, w - 20, S, 3).y + gap
+		y += font.get_multiline_string_size(_rule_text(keys[i]), HORIZONTAL_ALIGNMENT_LEFT, w - 20, S, 3).y + gap
 	var blink := 0.65 + 0.35 * sin(time * 3.0)
 	_text(tr("RULES_CLOSE"), Vector2(r.position.x, r.end.y - 10), S, Color(Palette.GOLD, blink), HORIZONTAL_ALIGNMENT_CENTER, r.size.x)
 	draw_set_transform_matrix(Transform2D.IDENTITY)
+
+
+## A rule line; the shipping rule names the shipment cap.
+func _rule_text(key: String) -> String:
+	return tr(key) % Run.MAX_SHIP if key == "RULES_SHIP_1" else tr(key)
 
 
 ## The boss card: a red flash, the boss's face, its name and what it does.

@@ -126,10 +126,10 @@ SHIP_KEYS,Q: fewer   right-click: up to,Q: mniej   PPM: do tej
 HINT_SHIP_BUBBLE,Swap neighbours. Sorted numbers wait at the exit: E ships them.,Zamieniaj sąsiadów. Posortowane czekają przy wyjściu: E je wysyła.
 HINT_SHIP_INSERTION,Put the gold key into the sorted top. E ships the ready ones.,Wstaw złoty klucz wyżej. E wysyła gotowe.
 HELP_SHIP,E / Q / right-click|ship the ready run / fewer / up to here,E / Q / PPM|wyślij gotowe / mniej / do tej
-RULES_SHIP_1,Numbers that are sorted at the exit glow green. They wait there until you ship them with E (1 move).,"Liczby posortowane przy wyjściu świecą na zielono. Czekają, aż wyślesz je klawiszem E (1 ruch)."
+RULES_SHIP_1,"Numbers sorted at the exit glow green and wait until you ship them with E (1 move, up to %d at a time).","Posortowane przy wyjściu świecą na zielono i czekają, aż wyślesz je klawiszem E (1 ruch, najwyżej %d naraz)."
 RULES_SHIP_2,"A shipment scores × its length, more for patterns: straight 4 5 6, a match 7 7, all even, all prime...","Wysyłka daje × swoją długość, więcej za wzory: strit 4 5 6, komplet 7 7, same parzyste, same pierwsze..."
 SHIPS,SHIPS,WYSYŁKI
-RULES_SHIP_3,"Shipments are few (next to your moves), and without them the room is lost: wait for long runs, but don't let the column overflow.","Wysyłek jest mało (obok ruchów), a bez nich przegrywasz pokój: czekaj na długie serie, ale nie przepełnij kolumny."
+RULES_SHIP_3,"Shipments are few, and without them the room is lost: wait for long runs, but don't let the column overflow.","Wysyłek jest mało, a bez nich przegrywasz pokój: czekaj na długie serie, ale nie przepełnij kolumny."
 HELP_MENU,ESC|menu: settings / quit,ESC|menu: ustawienia / wyjście
 MENU_TAGLINE,a roguelite about sorting,roguelite o sortowaniu
 MENU_PLAY,New run,Nowy run
@@ -177,7 +177,7 @@ HINT_QUICK,Pick a pivot: its segment splits around it. The smallest leaves.,Wybi
 HINT_SHIP_QUICK,"Pick a pivot to split a segment. E ships the ready ones.","Wybierz pivot, żeby podzielić odcinek. E wysyła gotowe."
 RULES_QUICK_1,Numbers not yet in their place form segments (the brackets). Pick a pivot in one and press SPACE.,Liczby jeszcze nie na swoim miejscu tworzą odcinki (nawiasy). Wybierz w jednym pivot i wciśnij SPACJĘ.
 RULES_QUICK_2,"The segment splits: smaller numbers go above the pivot, the rest below, and the pivot lands in its place.","Odcinek się dzieli: mniejsze idą nad pivot, reszta pod niego, a pivot trafia na swoje miejsce."
-RULES_QUICK_3,A split costs 1 move per other number in the segment. A middle value is cheap; the smallest reaches the exit sooner.,Podział kosztuje 1 ruch za każdą inną liczbę w odcinku. Środkowa wartość jest tania; najmniejsza szybciej trafia do wyjścia.
+RULES_QUICK_3,"A split costs 1 move per other number in the segment. A middle value is cheap; the smallest leaves sooner.","Podział kosztuje 1 ruch za każdą inną liczbę odcinka. Środkowa jest tania, najmniejsza szybciej wychodzi."
 RULES_QUICK_4,"The smallest number leaves through the exit. When the top is sorted, several leave in a chain.","Najmniejsza liczba wychodzi wyjściem. Gdy góra jest posortowana, kilka wychodzi łańcuchem."
 RULES_PIC_QUICK,Pivot 4: 2 goes above it.,Pivot 4: 2 idzie nad niego.
 PIVOT,PIVOT,PIVOT
@@ -191,3 +191,4 @@ SHOP_TITLE,SHOP: SPEND YOUR BITS,SKLEP: WYDAJ BITY
 SHOP_SOLD,SOLD,SPRZEDANE
 SHOP_SHIP_BOUGHT,+%d shipment next room,+%d wysyłka w następnym pokoju
 SHOP_KEYS,A D / click: choose   SPACE: buy   E: +1 shipment next room (%d)   R: restock (%d)   S: leave,A D / klik: wybór   SPACJA: kup   E: +1 wysyłka (%d)   R: nowy towar (%d)   S: wyjdź
+SHIP_CAP,up to %d per shipment,najwyżej %d na wysyłkę

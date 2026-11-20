@@ -17,6 +17,10 @@ const START_LIVES := 3
 const REROLL_COST := 2
 const HEAL_COST := 5
 const SKIP_BITS := 3
+## The most numbers one shipment may hold. In Insertion and Quick the whole
+## column becomes ready at once, and without a cap a strong build cleared
+## Quick rooms with one shipment in 43% of runs (16% with it).
+const MAX_SHIP := 6
 ## The shop opens once this many rooms are cleared (not after the last one).
 const SHOP_AFTER: Array[int] = [2, 4, 6]
 const SHOP_SIZE := 3
@@ -69,7 +73,7 @@ const ROOMS := {
 	&"fight_bubble": {"kind": FIGHT, "algorithm": Algorithms.BUBBLE, "target": 1500, "budget": 40,
 			"ship_cfg": {"every_moves": 4, "target": 4000, "ships": 7}},
 	&"fight_insertion": {"kind": FIGHT, "algorithm": Algorithms.INSERTION, "target": 2800, "budget": 40,
-			"ship_cfg": {"every_moves": 2, "target": 5000, "ships": 5}},
+			"ship_cfg": {"every_moves": 2, "target": 4700, "ships": 5}},
 	&"elite_bubble": {"kind": ELITE, "algorithm": Algorithms.BUBBLE, "kind_data": DataGen.REVERSED,
 			"start": 5, "every_moves": 4, "target": 1800, "budget": 45,
 			"ship_cfg": {"every_moves": 5, "target": 3200, "ships": 7}},
@@ -77,7 +81,7 @@ const ROOMS := {
 	# shipping at once would always be best: ship rooms use duplicates instead.
 	&"elite_insertion": {"kind": ELITE, "algorithm": Algorithms.INSERTION, "kind_data": DataGen.REVERSED,
 			"start": 7, "every_moves": 4, "target": 3000, "budget": 45,
-			"ship_cfg": {"kind_data": DataGen.DUPES, "target": 6000, "ships": 6}},
+			"ship_cfg": {"kind_data": DataGen.DUPES, "target": 5700, "ships": 6}},
 	&"boss_adversary": {"kind": BOSS, "algorithm": Algorithms.BUBBLE, "feed": RoomSession.FEED_ADVERSARY,
 			"boss": RoomSession.BOSS_ADVERSARY, "strike_every": 4, "start": 5, "every_moves": 4,
 			"target": 2400, "budget": 60,
@@ -93,7 +97,7 @@ const ROOMS := {
 	# Splits hand out long sorted runs by themselves, so with more shipments
 	# shipping at once was nearly as good as waiting: Quick rooms get 4.
 	&"fight_quick": {"kind": FIGHT, "algorithm": Algorithms.QUICK, "target": 4000, "budget": 40,
-			"ship_cfg": {"every_moves": 3, "target": 8500, "ships": 4}},
+			"ship_cfg": {"every_moves": 3, "target": 8000, "ships": 4}},
 	&"elite_pancake": {"kind": ELITE, "algorithm": Algorithms.PANCAKE, "start": 6, "target": 2300, "budget": 40,
 			"every_moves": 2, "ship_cfg": {"every_moves": 3, "target": 8000, "ships": 7}},
 	# Many equal numbers: a pivot sends its equals to one side, so the
@@ -308,6 +312,7 @@ static func session_config(entry: Dictionary, p_ship := false) -> Dictionary:
 		"boss": r.get("boss", RoomSession.BOSS_NONE),
 		"strike_every": r.get("strike_every", 5),
 		"ships": r.get("ships", -1),
+		"max_ship": MAX_SHIP if p_ship else -1,
 	}
 
 

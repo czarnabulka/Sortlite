@@ -54,6 +54,8 @@ const DEFAULTS := {
 	"ship": false,
 	## Ship room: shipments per room (Room.ships_left), -1 = no limit.
 	"ships": -1,
+	## Ship room: the most numbers in one shipment (Room.max_ship), -1 = any.
+	"max_ship": -1,
 }
 
 var room: Room
@@ -121,6 +123,7 @@ func _init(p_seed: int, p_mode: ArrivalMode, p_items: Array[Item] = [], config: 
 			cfg["target"], budget_max, bus, true)
 	room.manual_ship = bool(cfg["ship"])
 	room.ships_left = cfg["ships"] if room.manual_ship else -1
+	room.max_ship = int(cfg["max_ship"]) if room.manual_ship else -1
 	# The boss's phase shield: nothing gets past half of its HP before it is
 	# enraged, so even the biggest shipment cannot one-shot it.
 	if boss != BOSS_NONE:

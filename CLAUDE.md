@@ -110,10 +110,11 @@ only apply to this machine go in `CLAUDE.local.md`.
   algorithms) in 6 slots, a full hand replaces one; a shop after rooms 2, 4
   and 6; title screen, settings and pause menu; sound
   effects (levels checked by ear) and icons from the 1-Bit Pack.
-- Open questions: Insertion lets a strong build clear a room with one
-  shipment (about 80% on floor 1); Quick's ship decision is weaker than the
-  others' (greedy wins 23–35% with 5 items, even with 4 shipments); are the
-  Burnt Stack's sides readable to players;
+- Open questions: a strong build still clears floor 1 rooms with one
+  shipment (76–81%, the 6-number cap cut Quick's 43% to 14–19% but not
+  this); with the cap, waiting matters less in Insertion (greedy 26–30%
+  against 60–70%) and Quick (28%); are the Burnt Stack's sides readable to
+  players;
   are strong builds rewarded right (after the Sieve and
   Doubler nerf, Sieve + Doubler + Bubble Pump + Power Tower scores about 3×
   a room's target, was 5×);

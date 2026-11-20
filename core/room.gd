@@ -26,6 +26,9 @@ var manual_ship := false
 ## player has to wait for runs worth a shipment. At 0 the room is lost
 ## unless the target is already met.
 var ships_left := -1
+## Ship rooms: the most numbers one shipment may hold (-1 = no limit;
+## runs use Run.MAX_SHIP).
+var max_ship := -1
 ## The score cannot go past this (-1 = no cap). A boss's phase shield: one
 ## big shipment cannot skip a phase, the points over it are lost.
 var score_cap := -1
@@ -65,7 +68,7 @@ func play(move: Dictionary) -> bool:
 	var shipping: bool = move.get("type") == Events.SHIP
 	if shipping:
 		var n: int = move.get("count", 0)
-		if not manual_ship or n < 1 or n > ready_count() or ships_left == 0:
+		if not manual_ship or n < 1 or n > shippable() or ships_left == 0:
 			return false
 	elif not algorithm.is_legal(board, move):
 		return false
@@ -145,7 +148,7 @@ func affordable_moves() -> Array[Dictionary]:
 		if algorithm.move_cost(board, m) <= budget:
 			out.append(m)
 	if manual_ship and budget >= 1 and ships_left != 0:
-		for n in range(1, ready_count() + 1):
+		for n in range(1, shippable() + 1):
 			out.append({"type": Events.SHIP, "count": n})
 	return out
 
@@ -154,6 +157,12 @@ func affordable_moves() -> Array[Dictionary]:
 ## them there until shipped; classic rooms have 0 between moves).
 func ready_count() -> int:
 	return algorithm.ready_count(board)
+
+
+## How many of the ready numbers one shipment may take now.
+func shippable() -> int:
+	var ready := ready_count()
+	return ready if max_ship < 0 else mini(ready, max_ship)
 
 
 ## Points an element brings before any multiplier.

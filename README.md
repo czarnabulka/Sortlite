@@ -43,8 +43,8 @@ three start a run at once. `--lang pl` picks the language for one launch, and
   **Quick**: pick a pivot in a segment not yet in place; the segment splits
   around it (1 move per other number in it) and the pivot lands in place;
   the smallest number is ready at the exit.
-- Ready numbers wait at the exit. **E** ships them as one hand (1 move),
-  **Q** ships fewer. Each number scores `value × 10 × mult`; the mult is the
+- Ready numbers wait at the exit. **E** ships them as one hand (1 move, up
+  to 6 numbers), **Q** ships fewer. Each number scores `value × 10 × mult`; the mult is the
   hand's length plus a bonus per number for each pattern:
 
   | Pattern | Example | Bonus per number |

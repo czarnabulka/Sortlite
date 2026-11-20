@@ -56,7 +56,7 @@ static func choose_in(session: RoomSession, policy := SMART) -> Dictionary:
 	var room := session.room
 	if not room.manual_ship:
 		return choose_for(room)
-	var ready := room.ready_count()
+	var ready := room.shippable()
 	if policy == GREEDY:
 		return {"type": Events.SHIP, "count": ready} if ready > 0 else choose_for(room)
 	return _smart(session, ready)

@@ -13,7 +13,9 @@ extends SceneTree
 
 ## Options after `--`: `--seeds 100` (default 300), `--only fight_bubble`
 ## (or a prefix with `*`: `--only "*quick"`), `--ship` (skip the classic rows),
-## `--items 0,2` (how many random items, one row each; default 0,2). Items are
+## `--items 0,2` (how many random items, one row each; default 0,2),
+## `--cap 6` (at most that many numbers per shipment instead of
+## Run.MAX_SHIP; `--cap -1` = no cap). Items are
 ## drawn from those that work in the room's algorithm. By floor 2 a player
 ## holds 4-5 items: `--items 4,5`. `--build sieve,doubler` plays a fixed
 ## build instead (in that slot order), to see what a chosen build does.
@@ -22,6 +24,8 @@ extends SceneTree
 ## target: a room that one hand can clear has no ship decision left.
 var seeds := 300
 var build: Array[StringName] = []
+## The shipment cap to play with; -2 = the room's own (Run.MAX_SHIP).
+var cap := -2
 
 
 func _initialize() -> void:
@@ -39,6 +43,9 @@ func _initialize() -> void:
 		counts.clear()
 		for n in args[i + 1].split(",", false):
 			counts.append(int(n))
+	i = args.find("--cap")
+	if i >= 0 and i + 1 < args.size():
+		cap = int(args[i + 1])
 	i = args.find("--build")
 	if i >= 0 and i + 1 < args.size():
 		for id in args[i + 1].split(",", false):
@@ -82,6 +89,8 @@ func _report(key: StringName, room_cfg: Dictionary, n_items: int, ship: bool, po
 		var cfg := cfg0.duplicate()
 		cfg["enrage_at"] = ceili(target / 2.0)
 		cfg["target"] = 1_000_000_000
+		if cap != -2:
+			cfg["max_ship"] = cap
 		var session := RoomSession.new(s, RoomSession.ArrivalMode.TURNS, items, cfg)
 		session.start()
 		var guard := 0
