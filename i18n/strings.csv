@@ -15,8 +15,8 @@ OVERFLOW,OVERFLOW! -1 LIFE,PRZELANIE! -1 ŻYCIE
 CHAIN_BANNER,CHAIN ×%d,ŁAŃCUCH ×%d
 POINTS_X_MULT,POINTS × MULT,PUNKTY × MNOŻNIK
 ITEMS,ITEMS,PRZEDMIOTY
-HELP_SELECT,W S / arrows / wheel|pick a pair or a place,W S / strzałki / kółko|wybór pary albo miejsca
-HELP_SWAP,SPACE / click|swap or insert,SPACJA / klik|zamiana albo wstawienie
+HELP_SELECT,"W S / arrows / wheel|pick a pair, a place, a flip or a pivot","W S / strzałki / kółko|wybór pary, miejsca, odwrócenia albo pivota"
+HELP_SWAP,SPACE / click|swap / insert / flip / split,SPACJA / klik|zamiana / wstawienie / odwrócenie / podział
 HELP_LET_IN,F|let the next one in now,F|wpuść następny teraz
 HELP_TOGGLE,H|show / hide this card,H|pokaż / ukryj tę kartę
 HELP_TITLE,CONTROLS,STEROWANIE
@@ -69,9 +69,9 @@ YOUR_ITEMS,YOUR ITEMS,TWOJE PRZEDMIOTY
 CHOOSE_ITEM,CHOOSE AN ITEM FOR THE NEXT ROOM,WYBIERZ PRZEDMIOT NA NASTĘPNY POKÓJ
 SLOTS_FULL,ALL ITEM SLOTS ARE FULL: S SKIPS FOR BITS,WSZYSTKIE MIEJSCA ZAJĘTE: S POMIJA ZA BITY
 REWARD_KEYS,A D / click: pick   SPACE: take   S: skip (+%d bits)   R: reroll (%d)   E: heal (%d),A D / klik: wybór   SPACJA: bierz   S: pomiń (+%d bitów)   R: losuj (%d)   E: lecz (%d)
-FLOOR_CLEARED,FLOOR CLEARED,PIĘTRO ZALICZONE
+RUN_CLEARED,RUN CLEARED,RUN UKOŃCZONY
 RUN_OVER,RUN OVER,KONIEC RUNU
-ROOM_REACHED,lost in room %d of %d,przegrana w pokoju %d z %d
+ROOM_REACHED,"lost on floor %d, room %d of %d","przegrana na piętrze %d, w pokoju %d z %d"
 TOTAL_SCORE,total score %d,łączny wynik %d
 NEW_RUN,R: new run,R: nowy run
 HELP_RULES,I|rules of this room,I|zasady tego pokoju
@@ -89,16 +89,16 @@ RULES_PIC_BUBBLE,9 is lower and bigger: swap.,9 jest niżej i większa: zamiana.
 RULES_PIC_INSERTION,4 goes between 2 and 5.,4 trafia między 2 i 5.
 BOSS_LABEL,BOSS,BOSS
 BOSS_NAME_ADVERSARY,THE ADVERSARY,ADWERSARZ
-BOSS_INTRO_1,Its numbers are bigger than anything on the board and cursed: they score half.,Jego liczby są większe niż wszystko na planszy i przeklęte: dają połowę punktów.
-BOSS_INTRO_2,Every %d moves it strikes: it swaps a sorted pair (move it first to dodge) or throws in a number. At half HP it gets angry.,"Co %d ruchy atakuje: zamienia posortowaną parę (rusz ją pierwszy, żeby zrobić unik) albo wrzuca liczbę. Przy połowie HP wpada we wściekłość."
+BOSS_INTRO_ADVERSARY_1,Its numbers are bigger than anything on the board and cursed: they score half.,Jego liczby są większe niż wszystko na planszy i przeklęte: dają połowę punktów.
+BOSS_INTRO_ADVERSARY_2,Every %d moves it strikes: it swaps a sorted pair (move it first to dodge) or throws in a number. At half HP it gets angry.,"Co %d ruchy atakuje: zamienia posortowaną parę (rusz ją pierwszy, żeby zrobić unik) albo wrzuca liczbę. Przy połowie HP wpada we wściekłość."
 BOSS_FIGHT,SPACE: fight,SPACJA: do walki
-BOSS_HP,ADVERSARY HP,HP ADWERSARZA
-BOSS_STRIKES_IN,Moves until the Adversary strikes: %d,Ruchy do ataku Adwersarza: %d
+BOSS_HP_ADVERSARY,ADVERSARY HP,HP ADWERSARZA
+BOSS_STRIKES_IN_ADVERSARY,Moves until the Adversary strikes: %d,Ruchy do ataku Adwersarza: %d
 BOSS_AIMING,It is aiming at the red pair! Move it to dodge.,"Celuje w czerwoną parę! Rusz ją, żeby zrobić unik."
 BOSS_STRIKE,STRIKE!,ATAK!
 BOSS_DODGED,DODGED!,UNIK!
 BOSS_SHIELD,SHIELD -%d,TARCZA -%d
-BOSS_INTRO_3,Shield: one shipment cannot take more than half of its HP.,Tarcza: jedna wysyłka nie zbije więcej niż połowy HP.
+BOSS_INTRO_SHIELD,Shield: one shipment cannot take more than half of its HP.,Tarcza: jedna wysyłka nie zbije więcej niż połowy HP.
 NEXT_BOSS,NEXT: THE BOSS. CHOOSE WELL.,NASTĘPNY: BOSS. WYBIERAJ MĄDRZE.
 FX_MOVE_BACK,+1 move,+1 ruch
 FX_SAVED,life saved,życie ocalone
@@ -153,3 +153,31 @@ SET_ARRIVALS_TURNS,every few moves,co kilka ruchów
 SET_ARRIVALS_TIME,every few seconds,co kilka sekund
 SET_ON,on,wł.
 SET_OFF,off,wył.
+ALGO_PANCAKE,Pancake Sort,Pancake Sort
+HINT_PANCAKE,Flip the top of the stack. The biggest leaves at the bottom.,Odwracaj górę stosu. Największa wychodzi na dole.
+HINT_SHIP_PANCAKE,Flip the top of the stack. Sorted ones wait on the plate: E ships.,Odwracaj górę stosu. Gotowe czekają na talerzu: E wysyła.
+RULES_PANCAKE_1,Pick a number and press SPACE: the spatula flips it over together with everything above it (1 move).,Wybierz liczbę i wciśnij SPACJĘ: łopatka odwraca ją razem ze wszystkim nad nią (1 ruch).
+RULES_PANCAKE_2,"The exit is at the bottom: the biggest number on the board leaves once it lies on the plate.","Wyjście jest na dole: największa liczba na planszy wychodzi, gdy leży na talerzu."
+RULES_PANCAKE_3,"Two flips bring any number down: to the top, then into place. Flipping the sorted bottom is wrong.","Dwa odwrócenia sprowadzą każdą liczbę: na górę, potem na miejsce. Ruszanie posortowanego dołu to błąd."
+RULES_PANCAKE_4,"If the bottom is already sorted, several leave in a row: a chain multiplies the points.","Jeśli dół jest już posortowany, kilka wychodzi naraz: łańcuch mnoży punkty."
+RULES_PIC_PANCAKE,Flip from 9: 9 lands on top.,Odwróć od 9: 9 ląduje na górze.
+WRONG_FLIP,WRONG FLIP,ZŁE ODWRÓCENIE
+RULES_BURNT,"BOSS: a flip also turns numbers over, and burnt side up scores half. Flip the top one alone to turn it back.","BOSS: odwrócenie obraca też liczby, a przypalona do góry daje połowę. Odwróć samą górną, żeby ją obrócić."
+BOSS_NAME_BURNT,THE BURNT STACK,SPALONY STOS
+BOSS_HP_BURNT,BURNT STACK HP,HP SPALONEGO STOSU
+BOSS_STRIKES_IN_BURNT,Moves until the Burnt Stack strikes: %d,Ruchy do ataku Spalonego Stosu: %d
+BOSS_INTRO_BURNT_1,"Every number has a burnt side. A flip turns each flipped number over, and burnt side up scores half.","Każda liczba ma przypaloną stronę. Odwrócenie obraca każdą odwróconą liczbę, a przypalona do góry daje połowę punktów."
+BOSS_INTRO_BURNT_2,"Every %d moves it scorches the clean number nearest the exit (move or ship it first to dodge). At half HP it sends burnt numbers.","Co %d ruchy przypala czystą liczbę najbliżej wyjścia (rusz ją albo wyślij, żeby zrobić unik). Od połowy HP przysyła przypalone liczby."
+BOSS_AIMING_SCORCH,It will scorch the red number! Move or ship it.,Przypali czerwoną liczbę! Rusz ją albo wyślij.
+BOSS_SCORCH,SCORCHED!,PRZYPALONA!
+FLOOR_N,FLOOR %d,PIĘTRO %d
+FLOOR_START,FLOOR %d · CHOOSE AN ITEM FOR THE NEXT ROOM,PIĘTRO %d · WYBIERZ PRZEDMIOT NA NASTĘPNY POKÓJ
+ALGO_QUICK,Quick Sort,Quick Sort
+HINT_QUICK,Pick a pivot: its segment splits around it. The smallest leaves.,Wybierz pivot: jego odcinek dzieli się wokół niego. Najmniejsza wychodzi.
+HINT_SHIP_QUICK,"Pick a pivot to split a segment. E ships the ready ones.","Wybierz pivot, żeby podzielić odcinek. E wysyła gotowe."
+RULES_QUICK_1,Numbers not yet in their place form segments (the brackets). Pick a pivot in one and press SPACE.,Liczby jeszcze nie na swoim miejscu tworzą odcinki (nawiasy). Wybierz w jednym pivot i wciśnij SPACJĘ.
+RULES_QUICK_2,"The segment splits: smaller numbers go above the pivot, the rest below, and the pivot lands in its place.","Odcinek się dzieli: mniejsze idą nad pivot, reszta pod niego, a pivot trafia na swoje miejsce."
+RULES_QUICK_3,A split costs 1 move per other number in the segment. A middle value is cheap; the smallest reaches the exit sooner.,Podział kosztuje 1 ruch za każdą inną liczbę w odcinku. Środkowa wartość jest tania; najmniejsza szybciej trafia do wyjścia.
+RULES_QUICK_4,"The smallest number leaves through the exit. When the top is sorted, several leave in a chain.","Najmniejsza liczba wychodzi wyjściem. Gdy góra jest posortowana, kilka wychodzi łańcuchem."
+RULES_PIC_QUICK,Pivot 4: 2 goes above it.,Pivot 4: 2 idzie nad niego.
+PIVOT,PIVOT,PIVOT

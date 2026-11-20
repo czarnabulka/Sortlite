@@ -4,10 +4,14 @@ extends Node2D
 ## input into moves. The run screen gives it a session and listens for
 ## `continue_pressed` once the room is over.
 ##
-## Both algorithms use a column with the exit at the top:
+## Every algorithm uses a column:
 ## - Bubble: index 0 is the bottom; the biggest leaves through the top.
 ## - Insertion: index 0 is the top; the sorted part grows from the top, the
 ##   key (first unsorted element) is inserted into it, the smallest leaves.
+## - Pancake: index 0 is the bottom, and so is the exit (the plate); the
+##   spatula flips everything above it, newcomers drop on top.
+## - Quick: index 0 is the top (the exit); brackets mark the segments not yet
+##   in place, and a pivot splits its segment.
 
 signal continue_pressed
 ## The player switched arrivals between moves and time (M); the run keeps it.
@@ -21,6 +25,9 @@ const EL_H := 26.0
 const PANEL_L := 14.0
 const PANEL_R := 420.0
 const PANEL_R_W := 206.0
+## Item rows on the right: the first row's top, and the step between rows.
+const ITEM_TOP := 118.0
+const ITEM_ROW := 20.0
 
 const SWAP_DUR := 0.14
 const ARRIVE_DUR := 0.28
@@ -29,6 +36,9 @@ const POP_DUR := 0.24
 const CHAIN_STEP := 0.16
 const DEMO_STEP := 0.32
 const CURSED_COLOR := Color("b04ad6")
+## A number lying burnt side up (the Burnt Stack boss).
+const BURNT_COLOR := Color("3a2418")
+const BURNT_EDGE := Color("e0823a")
 ## How far the Insertion key sticks out of the column.
 const KEY_PULL := 12.0
 
@@ -77,6 +87,7 @@ class Floater:
 var session: RoomSession
 var room_no := 1
 var room_total := 1
+var floor_no := 1
 var room_kind: StringName = &"fight"
 var bits := 0
 var mode := RoomSession.ArrivalMode.TURNS
@@ -144,8 +155,9 @@ func _ready() -> void:
 
 
 func set_session(p_session: RoomSession, p_room_no: int, p_room_total: int, p_kind: StringName, p_bits: int,
-		show_rules := false) -> void:
+		show_rules := false, p_floor := 1) -> void:
 	session = p_session
+	floor_no = p_floor
 	intro_t = 0.0
 	end_t = 0.0
 	overlay_t = 0.0
@@ -173,6 +185,8 @@ func set_session(p_session: RoomSession, p_room_no: int, p_room_total: int, p_ki
 	# Added after the items, so the screen sees the final points and mult.
 	bus.on(Events.SWAP, _on_swap)
 	bus.on(Events.INSERT, _on_insert)
+	bus.on(Events.FLIP, _on_flip)
+	bus.on(Events.PARTITION, _on_partition)
 	bus.on(Events.WRONG_MOVE, _on_wrong)
 	bus.on(Events.SURFACE, _on_surface)
 	bus.on(Events.CHAIN, _on_chain)
@@ -218,6 +232,33 @@ func set_arrival_mode(new_mode: RoomSession.ArrivalMode) -> void:
 
 func is_bubble() -> bool:
 	return session.room.algorithm.id == Algorithms.BUBBLE
+
+
+func is_pancake() -> bool:
+	return session.room.algorithm.id == Algorithms.PANCAKE
+
+
+func is_insertion() -> bool:
+	return session.room.algorithm.id == Algorithms.INSERTION
+
+
+func is_quick() -> bool:
+	return session.room.algorithm.id == Algorithms.QUICK
+
+
+## Quick: true for every number already in its final place (not a pivot).
+func _placed() -> Array[bool]:
+	return (session.room.algorithm as QuickAlgorithm).placed(session.room.board)
+
+
+## Bubble and Pancake stack from the bottom: index 0 is the lowest cell.
+func _bottom_up() -> bool:
+	return is_bubble() or is_pancake()
+
+
+## Where scored numbers fly to: over the column, or under it in Pancake.
+func _exit_pos() -> Vector2:
+	return Vector2(TANK_CX, _tank_bottom() + 14.0) if is_pancake() else Vector2(TANK_CX, TANK_TOP - 14.0)
 
 
 func is_ship() -> bool:
@@ -364,23 +405,43 @@ func handle_input(event: InputEvent, local: Vector2) -> void:
 						Sfx.play(&"cursor")
 
 
-## +1 = towards the exit (up on screen) for both algorithms.
+## +1 = up on screen.
 func _step_selection(direction: int) -> void:
 	var lo_hi := _selection_range()
 	if lo_hi.y < lo_hi.x:
 		return
 	var before := selected
-	selected += direction if is_bubble() else -direction
+	if is_quick():
+		# Skip the numbers already in place: only the others can be pivots.
+		var done := _placed()
+		var j := selected
+		while true:
+			j -= direction
+			if j < 0 or j >= done.size():
+				return
+			if not done[j]:
+				break
+		selected = j
+		Sfx.play(&"cursor")
+		return
+	selected += direction if _bottom_up() else -direction
 	selected = clampi(selected, lo_hi.x, lo_hi.y)
 	if selected != before:
 		Sfx.play(&"cursor")
 
 
 ## Bubble: pairs 0..size-2. Insertion: places 0..k-1 before the key at k.
+## Pancake: the lowest flipped number, up to the one under the top (or the
+## top itself when numbers have sides).
 func _selection_range() -> Vector2i:
 	var board := session.room.board
 	if is_bubble():
 		return Vector2i(0, board.size() - 2)
+	if is_pancake():
+		var sides := (session.room.algorithm as PancakeAlgorithm).burnt_sides
+		return Vector2i(0, board.size() - (1 if sides else 2))
+	if is_quick():
+		return Vector2i(0, board.size() - 1) if _placed().has(false) else Vector2i(0, -1)
 	var k := board.sorted_prefix_length()
 	if k >= board.size():
 		return Vector2i(0, -1)
@@ -389,7 +450,12 @@ func _selection_range() -> Vector2i:
 
 func _reset_selection() -> void:
 	var r := _selection_range()
-	if is_bubble():
+	if is_quick():
+		# Keep a pivot that is still one, else the first number not in place.
+		var done := _placed()
+		if selected < 0 or selected >= done.size() or done[selected]:
+			selected = maxi(done.find(false), 0)
+	elif _bottom_up():
 		selected = clampi(selected, r.x, maxi(r.y, 0))
 	else:
 		selected = maxi(r.y, 0)  # nearest place: costs 1
@@ -397,7 +463,13 @@ func _reset_selection() -> void:
 
 func _act(target: int) -> void:
 	var wrong_before := session.room.wrong_moves
-	var move := {"type": Events.SWAP, "index": target} if is_bubble() else {"type": Events.INSERT, "to": target}
+	var move := {"type": Events.INSERT, "to": target}
+	if is_bubble():
+		move = {"type": Events.SWAP, "index": target}
+	elif is_pancake():
+		move = {"type": Events.FLIP, "index": target}
+	elif is_quick():
+		move = {"type": Events.PARTITION, "index": target}
 	if not session.play(move):
 		return
 	if session.room.wrong_moves > wrong_before:
@@ -422,6 +494,12 @@ func _target_at(p: Vector2) -> int:
 	var j: int
 	if is_bubble():
 		j = int(roundf((_tank_bottom() - p.y) / SLOT_H)) - 1
+	elif is_pancake():
+		j = int(floorf((_tank_bottom() - p.y) / SLOT_H))
+	elif is_quick():
+		j = int(floorf((p.y - TANK_TOP) / SLOT_H))
+		if j >= 0 and j < board.size() and _placed()[j]:
+			return -1
 	else:
 		j = int(floorf((p.y - TANK_TOP) / SLOT_H))
 	return j if j >= r.x and j <= r.y and j < board.size() else -1
@@ -430,7 +508,7 @@ func _target_at(p: Vector2) -> int:
 func _item_row_at(p: Vector2) -> int:
 	if p.x < PANEL_R or p.x > PANEL_R + PANEL_R_W:
 		return -1
-	var i := int(floorf((p.y - 118.0) / 22.0))
+	var i := int(floorf((p.y - ITEM_TOP) / ITEM_ROW))
 	return i if i >= 0 and i < session.items.size() else -1
 
 
@@ -452,12 +530,33 @@ func _on_insert(data: Dictionary) -> void:
 	pending_arc[session.room.board.cells[p].uid] = 22.0  # the key swings out and in
 
 
+## A flip: the flipped numbers swing out to the right, further the further
+## they travel. A number turned over alone stays put.
+func _on_flip(data: Dictionary) -> void:
+	if not data["wrong"]:
+		Sfx.play(&"flip")
+	var i: int = data["move"]["index"]
+	var cells := session.room.board.cells
+	var top := cells.size() - 1
+	for k in range(i, top + 1):
+		pending_arc[cells[k].uid] = 10.0 + 4.0 * absf(2 * k - i - top)
+
+
+## A split: every number that moves swings out a little on its way.
+func _on_partition(_data: Dictionary) -> void:
+	Sfx.play(&"partition")
+	for e in session.room.board.cells:
+		pending_arc[e.uid] = 10.0
+
+
 func _on_wrong(data: Dictionary) -> void:
 	Sfx.play(&"wrong")
 	var move: Dictionary = data["move"]
 	var j: int = move.get("index", move.get("to", 0))
 	if is_bubble():
 		_float(tr("WRONG_SWAP"), Vector2(TANK_CX + TANK_W * 0.5 + 14, _slot_pos(j).y - 8), Palette.BAD, S)
+	elif is_pancake():
+		_float(tr("WRONG_FLIP"), Vector2(TANK_CX + TANK_W * 0.5 + 14, _slot_pos(j).y - 8), Palette.BAD, S)
 	else:
 		var text := tr("WRONG_INSERT")
 		var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, M).x
@@ -469,7 +568,7 @@ func _on_surface(data: Dictionary) -> void:
 	var g := Ghost.new()
 	g.value = ctx.element.value
 	var v: Vis = vis.get(ctx.element.uid)
-	g.start = v.pos if v != null else _slot_pos(0 if not is_bubble() else session.room.board.size())
+	g.start = v.pos if v != null else _slot_pos(session.room.board.size() if is_bubble() else 0)
 	g.pos = g.start
 	g.chain = ctx.chain
 	g.delay = SWAP_DUR + (ctx.chain - 1) * CHAIN_STEP
@@ -546,6 +645,14 @@ func _on_boss_aim(_data: Dictionary) -> void:
 
 func _on_boss_strike(data: Dictionary) -> void:
 	Sfx.play(&"boss_strike")
+	if data["mode"] == RoomSession.STRIKE_SCORCH:
+		var i: int = data["index"]
+		shake = 5.0
+		tank_flash = 0.5
+		var st := tr("BOSS_SCORCH")
+		var sw := font.get_string_size(st, HORIZONTAL_ALIGNMENT_LEFT, -1, L).x
+		_float(st, Vector2(TANK_CX - sw * 0.5, _slot_pos(i).y + 10), BURNT_EDGE, L)
+		return
 	if data["mode"] == RoomSession.STRIKE_THROW:
 		shake = 5.0
 		tank_flash = 0.5
@@ -601,7 +708,7 @@ func _item_float(id: StringName, text: String, color: Color) -> void:
 	var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, M).x
 	var f := Floater.new()
 	f.text = text
-	f.pos = Vector2(PANEL_R + PANEL_R_W - w - 6, 118.0 + i * 22.0 + 17.0)
+	f.pos = Vector2(PANEL_R + PANEL_R_W - w - 6, ITEM_TOP + i * ITEM_ROW + 15.0)
 	f.color = color
 	f.size = M
 	f.life = 1.0
@@ -648,6 +755,8 @@ func _process(delta: float) -> void:
 	var r := _selection_range()
 	if r.y >= r.x:
 		selected = clampi(selected, r.x, r.y)
+	if is_quick():
+		_reset_selection()  # a ship or an arrival can put the pivot in place
 
 	_sync_visuals()
 	for v: Vis in vis.values():
@@ -725,7 +834,7 @@ func _sync_visuals() -> void:
 
 
 func _update_ghosts(delta: float) -> void:
-	var exit_pos := Vector2(TANK_CX, TANK_TOP - 14.0)
+	var exit_pos := _exit_pos()
 	var kept: Array[Ghost] = []
 	for g in ghosts:
 		if g.delay > 0.0:
@@ -747,9 +856,9 @@ func _update_ghosts(delta: float) -> void:
 func _pop(g: Ghost) -> void:
 	Sfx.play(&"score", Sfx.score_pitch(g.chain))
 	if g.chain >= 4:
-		Sfx.play(&"chips", Sfx.score_pitch(g.chain))
-	if not g.effects.is_empty():
-		Sfx.play(&"item")
+		Sfx.play(&"chips")  # at its own pitch: pitched up it hissed
+	# Items that added to this number show it over their rows; a glass ping
+	# on every number as well was too much.
 	if g.chain == ship_total and ship_total >= 3:
 		# The last number of a long shipment: a handful of chips, bigger the longer it was.
 		Sfx.play(&"combo_big" if ship_total >= 7 else (&"combo_mid" if ship_total >= 5 else &"combo_small"))
@@ -773,7 +882,7 @@ func _pop(g: Ghost) -> void:
 	# its arrow, so its scores go on the left.
 	var fy := TANK_TOP + 10.0 + (pop_line % 9) * 16.0
 	pop_line += 1
-	var fx := TANK_CX + TANK_W * 0.5 + 14 if is_bubble() else TANK_CX - TANK_W * 0.5 - 38
+	var fx := TANK_CX + TANK_W * 0.5 + 14 if _bottom_up() else TANK_CX - TANK_W * 0.5 - 38
 	_float("+%d" % g.gained, Vector2(fx, fy), Palette.GOLD, S)
 
 
@@ -835,12 +944,13 @@ func _draw_left_panel() -> void:
 	_text(tr("KIND_" + String(room_kind).to_upper()), Vector2(x, 22), M, kind_color)
 	_text(tr("ROOM_N_OF") % [room_no, room_total], Vector2(x, 22), M, Palette.MUTED, right, w)
 	_text(tr("ALGO_" + String(room.algorithm.id).to_upper()), Vector2(x, 39), S, Palette.SOFT)
+	_text(tr("FLOOR_N") % floor_no, Vector2(x, 39), S, Palette.MUTED, right, w)
 
 	if is_boss():
 		# Every point you score is damage: the bar empties as the boss loses.
 		_panel(Rect2(x, 46, w, 66), Palette.BAD.darkened(0.2))
-		Icons.draw_boss(self, Rect2(x + w - 40, 52, 32, 32))
-		_text(tr("BOSS_HP") + ("  " + tr("BOSS_PHASE_2") if session.enraged else ""), Vector2(x + 8, 62), S, Palette.BAD.lightened(0.2))
+		Icons.draw_boss(self, Rect2(x + w - 40, 52, 32, 32), 1.0, session.boss)
+		_text(tr("BOSS_HP_" + String(session.boss).to_upper()) + ("  " + tr("BOSS_PHASE_2") if session.enraged else ""), Vector2(x + 8, 62), S, Palette.BAD.lightened(0.2))
 		var hp := maxi(room.target - int(shown_score), 0)
 		_text(str(hp), Vector2(x + 8, 94), L, Palette.TEXT)
 		_text("/ %d" % room.target, Vector2(x + 8, 94), S, Palette.MUTED, right, w - 56)
@@ -901,9 +1011,13 @@ func _draw_left_panel() -> void:
 	# How this room works; in a boss room, when it strikes next
 	if session.boss != RoomSession.BOSS_NONE:
 		var aiming := session.is_aiming()
-		var warn := tr("BOSS_STRIKES_IN") % session.moves_to_strike
+		var warn := tr("BOSS_STRIKES_IN_" + String(session.boss).to_upper()) % session.moves_to_strike
 		if aiming:
-			warn = tr("BOSS_AIMING") if session.is_aiming_pair() else tr("BOSS_AIMING_THROW")
+			warn = tr("BOSS_AIMING_THROW")
+			if session.strike_mode == RoomSession.STRIKE_SWAP:
+				warn = tr("BOSS_AIMING")
+			elif session.strike_mode == RoomSession.STRIKE_SCORCH:
+				warn = tr("BOSS_AIMING_SCORCH")
 		var a := 0.6 + 0.4 * sin(time * 10.0) if aiming else 1.0
 		_panel(Rect2(x, 308, w, 40), Palette.BAD if aiming else Palette.BAD.darkened(0.4))
 		draw_multiline_string(font, Vector2(x + 8, 324), warn, HORIZONTAL_ALIGNMENT_LEFT, w - 16, S, 2, Color(Palette.BAD.lightened(0.3), a))
@@ -972,9 +1086,11 @@ func _draw_tank() -> void:
 		edge = edge.lerp(Palette.BAD, 0.4 + 0.3 * sin(time * 8.0))
 	draw_rect(r, edge, false, 1.0)
 
-	# Exit line
-	draw_dashed_line(Vector2(r.position.x - 6, TANK_TOP - 4), Vector2(r.end.x + 6, TANK_TOP - 4), Palette.GOLD.darkened(0.3), 1.0, 4.0)
-	_text(tr("EXIT"), Vector2(r.position.x, TANK_TOP - 9), S, Palette.GOLD.darkened(0.15), HORIZONTAL_ALIGNMENT_CENTER, TANK_W)
+	# Exit line: over the column, or under it in Pancake (the plate)
+	var exit_y := bottom + 4.0 if is_pancake() else TANK_TOP - 4.0
+	var exit_text_y := bottom + 20.0 if is_pancake() else TANK_TOP - 9.0
+	draw_dashed_line(Vector2(r.position.x - 6, exit_y), Vector2(r.end.x + 6, exit_y), Palette.GOLD.darkened(0.3), 1.0, 4.0)
+	_text(tr("EXIT"), Vector2(r.position.x, exit_text_y), S, Palette.GOLD.darkened(0.15), HORIZONTAL_ALIGNMENT_CENTER, TANK_W)
 
 	# Fill level ticks on the side (Insertion uses that side for the arrow)
 	if is_bubble():
@@ -990,26 +1106,33 @@ func _draw_tank() -> void:
 			var pr := _pair_rect(selected)
 			draw_rect(pr, Palette.GOLD, false, 1.0)
 			_marker(Vector2(pr.position.x, pr.get_center().y))
+	elif is_pancake():
+		_draw_spatula(r, playing)
+	elif is_quick():
+		_draw_quick_guides(r, playing)
 	else:
 		_draw_insertion_guides(r, playing)
 	if is_ship() and playing:
 		_draw_ship_bracket(r)
-	if playing and session.is_aiming_pair():
+	if playing and session.is_aiming_cells():
 		_draw_aim(r)
 
-	# Next arrival
+	# Next arrival: under the column, or over it in Pancake (it drops on top)
 	var nb := Rect2(r.position.x, bottom + 5, TANK_W, 40)
-	var throwing := playing and session.is_aiming() and not session.is_aiming_pair()
+	if is_pancake():
+		nb = Rect2(r.position.x, 3, TANK_W, 36)
+	var throwing := playing and session.is_aiming() and not session.is_aiming_cells()
 	if throwing:
 		var a := 0.6 + 0.4 * sin(time * 10.0)
 		_panel(nb, Color(Palette.BAD, a), Palette.PANEL.lerp(Palette.BAD, 0.25 * a))
-		Icons.draw_boss(self, Rect2(nb.position.x - 24, nb.position.y + 12, 16, 16), a)
+		Icons.draw_boss(self, Rect2(nb.position.x - 24, nb.get_center().y - 8, 16, 16), a, session.boss)
 	else:
 		_panel(nb)
-	_text(tr("NEXT"), Vector2(nb.position.x + 6, nb.position.y + 17), S, Palette.MUTED)
+	var line2 := nb.size.y - 6.0
+	_text(tr("NEXT"), Vector2(nb.position.x + 6, nb.position.y + line2 - 17), S, Palette.MUTED)
 	var info := tr("IN_N_MOVES") % session.moves_until_arrival() if mode == RoomSession.ArrivalMode.TURNS else "%.1f s" % (session.interval_sec - session.timer)
-	_text(info, Vector2(nb.position.x + 6, nb.position.y + 34), S, Palette.TEXT)
-	var chip := Rect2(nb.end.x - 34, nb.position.y + 7, 28, 26)
+	_text(info, Vector2(nb.position.x + 6, nb.position.y + line2), S, Palette.TEXT)
+	var chip := Rect2(nb.end.x - 34, nb.get_center().y - 13, 28, 26)
 	_rounded(chip, Palette.value_color(session.next_value, session.vmax), 3)
 	_text(str(session.next_value), Vector2(chip.position.x, chip.position.y + 19), M, Palette.INK, HORIZONTAL_ALIGNMENT_CENTER, chip.size.x)
 	_bar(Rect2(nb.position.x, nb.end.y + 2, nb.size.x, 3), session.arrival_progress(), Palette.GOLD)
@@ -1072,24 +1195,94 @@ func _draw_insertion_guides(r: Rect2, playing: bool) -> void:
 	_text(tr("COST_N") % cost, Vector2(lane, gy + 6), S, Palette.BAD if cost > session.room.budget else Palette.TEXT)
 
 
-## The pair the boss will swap after your next move: a red pulsing frame
-## and a warning sign. Move one of them first to dodge.
+## Pancake: the spatula under the selected number, its handle out to the
+## right, and a bracket over what it would flip.
+func _draw_spatula(r: Rect2, playing: bool) -> void:
+	var board := session.room.board
+	if not playing or board.is_empty():
+		return
+	var rr := _selection_range()
+	if rr.y < rr.x:
+		return
+	if hover >= 0 and hover != selected:
+		var hy := _slot_pos(hover).y + SLOT_H * 0.5
+		draw_line(Vector2(r.position.x + 4, hy), Vector2(r.end.x - 4, hy), Palette.MUTED, 1.0)
+	var sy := _slot_pos(selected).y + SLOT_H * 0.5
+	var top_y := _slot_pos(board.size() - 1).y - SLOT_H * 0.5
+	var pulse := 0.75 + 0.25 * sin(time * 6.0)
+	# The blade under the number, the handle out of the column.
+	draw_rect(Rect2(r.position.x + 2, sy - 1.5, TANK_W - 4, 3), Color(Palette.GOLD, pulse))
+	draw_line(Vector2(r.end.x - 2, sy), Vector2(r.end.x + 22, sy - 6), Palette.GOLD, 2.0)
+	draw_rect(Rect2(r.end.x + 20, sy - 10, 14, 6), Palette.GOLD.darkened(0.25))
+	_marker(Vector2(r.position.x, sy))
+	# What turns over: a bracket from the blade up to the top.
+	var bx := r.end.x + 8
+	var c := Color(Palette.GOLD, 0.8)
+	draw_line(Vector2(bx, top_y + 3), Vector2(bx, sy - 8), c, 2.0)
+	draw_line(Vector2(bx, top_y + 3), Vector2(bx - 5, top_y + 3), c, 2.0)
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(bx - 4, sy - 10), Vector2(bx + 4, sy - 10), Vector2(bx, sy - 4)]), c)
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(bx - 4, top_y + 9), Vector2(bx + 4, top_y + 9), Vector2(bx, top_y + 3)]), c)
+
+
+## Quick: a bracket on the right of every segment not yet in place, the
+## pivot framed in gold, and what the split would cost.
+func _draw_quick_guides(r: Rect2, playing: bool) -> void:
+	var board := session.room.board
+	var algo := session.room.algorithm as QuickAlgorithm
+	for seg in algo.segments(board):
+		var y1 := TANK_TOP + seg.x * SLOT_H + 3.0
+		var y2 := TANK_TOP + seg.y * SLOT_H - 3.0
+		var bx := r.end.x + 6
+		var c := Palette.SOFT.darkened(0.2)
+		draw_line(Vector2(bx, y1), Vector2(bx, y2), c, 2.0)
+		draw_line(Vector2(bx - 4, y1), Vector2(bx, y1), c, 2.0)
+		draw_line(Vector2(bx - 4, y2), Vector2(bx, y2), c, 2.0)
+	if not playing:
+		return
+	var rr := _selection_range()
+	if rr.y < rr.x:
+		return
+	var done := algo.placed(board)
+	if hover >= 0 and hover != selected and hover < done.size() and not done[hover]:
+		var hp := _slot_pos(hover)
+		draw_rect(Rect2(hp - Vector2(EL_W, EL_H) * 0.5, Vector2(EL_W, EL_H)).grow(3), Palette.MUTED, false, 1.0)
+	if selected < 0 or selected >= done.size() or done[selected]:
+		return
+	var sp := _slot_pos(selected)
+	var pulse := 0.75 + 0.25 * sin(time * 6.0)
+	draw_rect(Rect2(sp - Vector2(EL_W, EL_H) * 0.5, Vector2(EL_W, EL_H)).grow(3), Color(Palette.GOLD, pulse), false, 2.0)
+	_marker(Vector2(r.position.x, sp.y))
+	var lane := r.end.x + 16
+	_text(tr("PIVOT"), Vector2(lane, sp.y - 2), S, Palette.GOLD)
+	var cost := algo.move_cost(board, {"type": Events.PARTITION, "index": selected})
+	_text(tr("COST_N") % cost, Vector2(lane, sp.y + 14), S, Palette.BAD if cost > session.room.budget else Palette.TEXT)
+
+
+## What the boss will hit after your next move (a pair to swap, a number to
+## scorch): a red pulsing frame and a warning sign. Move it first to dodge.
 func _draw_aim(r: Rect2) -> void:
 	var board := session.room.board
 	var idx: Array[int] = []
 	for i in board.size():
 		if board.cells[i].uid in session.strike_uids:
 			idx.append(i)
-	if idx.size() != 2:
+	if idx.is_empty():
 		return
-	var y1 := minf(_slot_pos(idx[0]).y, _slot_pos(idx[1]).y) - SLOT_H * 0.5
-	var y2 := maxf(_slot_pos(idx[0]).y, _slot_pos(idx[1]).y) + SLOT_H * 0.5
+	var y1 := _slot_pos(idx[0]).y
+	var y2 := y1
+	for i in idx:
+		y1 = minf(y1, _slot_pos(i).y)
+		y2 = maxf(y2, _slot_pos(i).y)
+	y1 -= SLOT_H * 0.5
+	y2 += SLOT_H * 0.5
 	var grow := 6.0 * (1.0 - Anim.ease_out_back(aim_t / 0.3))
 	var a := 0.6 + 0.4 * sin(time * 10.0)
 	var box := Rect2(r.position.x - 2 - grow, y1 - grow, r.size.x + 4 + grow * 2, y2 - y1 + grow * 2)
 	draw_rect(box, Color(Palette.BAD, a), false, 2.0)
 	var sign_pos := Vector2(box.position.x - 26, box.get_center().y - 12)
-	Icons.draw_boss(self, Rect2(sign_pos, Vector2(16, 16)), a)
+	Icons.draw_boss(self, Rect2(sign_pos, Vector2(16, 16)), a, session.boss)
 	_text("!", Vector2(sign_pos.x + 5, sign_pos.y + 34), M, Color(Palette.BAD, a))
 
 
@@ -1103,8 +1296,8 @@ func _draw_elements() -> void:
 	if board.is_empty():
 		return
 	# The element that leaves next: the biggest in Bubble, the smallest in Insertion.
-	var leaver := board.max_value() if is_bubble() else board.min_value()
-	var key_index := -1 if is_bubble() else board.sorted_prefix_length()
+	var leaver := board.max_value() if _bottom_up() else board.min_value()
+	var key_index := board.sorted_prefix_length() if is_insertion() else -1
 	var ready_now := session.room.ready_count() if is_ship() else 0
 	var ship_n_now := ship_count() if is_ship() and session.is_playing() else 0
 	for i in board.size():
@@ -1115,7 +1308,10 @@ func _draw_elements() -> void:
 		var r := Rect2(v.pos - Vector2(EL_W, EL_H) * 0.5, Vector2(EL_W, EL_H))
 		if i == key_index and session.is_playing():
 			r.position.x += KEY_PULL  # the key sticks out: it is in your hand
+		var burnt := e.has_marker(Element.BURNT)
 		var c := Palette.value_color(e.value, session.vmax)
+		if burnt:
+			c = c.lerp(BURNT_COLOR, 0.65)
 		c.a = v.alpha
 		_rounded(r, c, 4)
 		if i == key_index and session.is_playing():
@@ -1128,12 +1324,16 @@ func _draw_elements() -> void:
 				draw_rect(r.grow(2), Color(Palette.GOOD, 0.7), false, 1.0)
 		elif e.value == leaver:
 			draw_rect(r.grow(2), Color(Palette.GOLD, 0.5 + 0.3 * sin(time * 5.0)), false, 1.0)
-		_text(str(e.value), Vector2(r.position.x, r.position.y + 20), M, Color(Palette.INK, v.alpha), HORIZONTAL_ALIGNMENT_CENTER, EL_W)
+		var ink := Palette.TEXT if burnt else Palette.INK
+		_text(str(e.value), Vector2(r.position.x, r.position.y + 20), M, Color(ink, v.alpha), HORIZONTAL_ALIGNMENT_CENTER, EL_W)
 		if NumberProps.is_prime(e.value):
 			draw_rect(Rect2(r.position.x + 4, r.position.y + 4, 3, 3), Color(Palette.INK, 0.6 * v.alpha))
 		if e.has_marker(Element.CURSED):
 			draw_rect(r.grow(1), Color(CURSED_COLOR, v.alpha), false, 2.0)
 			Icons.draw_boss(self, Rect2(r.end.x - 18, r.position.y + 5, 16, 16), v.alpha)
+		if burnt:
+			draw_rect(r.grow(1), Color(BURNT_EDGE, v.alpha), false, 1.0)
+			Icons.draw_glyph(self, &"flame", Rect2(r.end.x - 18, r.position.y + 5, 16, 16), Color(BURNT_EDGE, v.alpha))
 
 
 func _draw_ghosts() -> void:
@@ -1169,7 +1369,7 @@ func _draw_right_panel() -> void:
 
 	# Items, one row each in slot order (= effect order), then the focused one
 	_text("%s  %d/%d" % [tr("ITEMS"), session.items.size(), Run.MAX_SLOTS], Vector2(x, 112), S, Palette.MUTED)
-	var y := 118.0
+	var y := ITEM_TOP
 	if session.items.is_empty():
 		_text(tr("NO_ITEMS"), Vector2(x + 8, y + 16), S, Palette.MUTED)
 	var focused: Item = null
@@ -1178,19 +1378,21 @@ func _draw_right_panel() -> void:
 		var is_focus := item.id == focus_item
 		if is_focus:
 			focused = item
-		var row := Rect2(x, y, w, 20)
+		var row := Rect2(x, y, w, ITEM_ROW - 2)
 		_panel(row, Palette.GOLD if flash > 0.0 else (Palette.SOFT.darkened(0.4) if is_focus else Palette.PANEL_EDGE),
 				Palette.PANEL.lerp(Palette.GOLD, flash * 0.3))
 		var bounce := 2.0 * sin(clampf(flash / 0.6, 0.0, 1.0) * PI)
-		Icons.draw(self, item.id, Rect2(x + 2, y + 2 - bounce, 16, 16))
-		_text(tr(item.name_key), Vector2(x + 24, y + 15), S, Palette.GOLD if flash > 0.0 else Palette.TEXT)
-		y += 22.0
+		Icons.draw(self, item.id, Rect2(x + 1, y + 1 - bounce, 16, 16))
+		_text(tr(item.name_key), Vector2(x + 24, y + 14), S, Palette.GOLD if flash > 0.0 else Palette.TEXT)
+		y += ITEM_ROW
 	if focused != null:
-		var box := Rect2(x, 236, w, 94)
+		# Under the last possible row, so it never moves as items are added.
+		var top := ITEM_TOP + Run.MAX_SLOTS * ITEM_ROW + 4.0
+		var box := Rect2(x, top, w, 336.0 - top)
 		_panel(box)
 		Icons.draw(self, focused.id, Rect2(box.end.x - 34, box.position.y + 6, 28, 28))
-		draw_multiline_string(font, Vector2(x + 8, 256), tr(focused.name_key), HORIZONTAL_ALIGNMENT_LEFT, w - 50, M, 1, Palette.GOLD)
-		draw_multiline_string(font, Vector2(x + 8, 284), tr(focused.desc_key), HORIZONTAL_ALIGNMENT_LEFT, w - 16, S, 3, Palette.SOFT)
+		draw_multiline_string(font, Vector2(x + 8, top + 20), tr(focused.name_key), HORIZONTAL_ALIGNMENT_LEFT, w - 50, M, 1, Palette.GOLD)
+		draw_multiline_string(font, Vector2(x + 8, top + 46), tr(focused.desc_key), HORIZONTAL_ALIGNMENT_LEFT, w - 16, S, 3, Palette.SOFT)
 
 	_text(tr("HELP_HINT"), Vector2(x, 346), S, Palette.MUTED, HORIZONTAL_ALIGNMENT_RIGHT, w)
 
@@ -1285,6 +1487,10 @@ func _draw_rules() -> void:
 	# Picture on the left
 	if is_bubble():
 		_draw_rules_picture_bubble(Vector2(r.position.x + 24, r.position.y + 62))
+	elif is_pancake():
+		_draw_rules_picture_pancake(Vector2(r.position.x + 24, r.position.y + 62))
+	elif is_quick():
+		_draw_rules_picture_quick(Vector2(r.position.x + 24, r.position.y + 62))
 	else:
 		_draw_rules_picture_insertion(Vector2(r.position.x + 24, r.position.y + 62))
 
@@ -1293,8 +1499,9 @@ func _draw_rules() -> void:
 	var w := r.end.x - 16 - x
 	var y := r.position.y + 64
 	var keys: Array[String] = []
-	# Ship rooms drop the lines about numbers leaving by themselves.
-	var numbers := ([1, 3] if is_bubble() else [1, 2, 3]) if is_ship() else [1, 2, 3, 4]
+	# Ship rooms drop the lines about numbers leaving by themselves (and
+	# Pancake's line about the exit: the picture and the ship lines say it).
+	var numbers := ([1, 3] if _bottom_up() else [1, 2, 3]) if is_ship() else [1, 2, 3, 4]
 	for i in numbers:
 		keys.append("RULES_%s_%d" % [algo, i])
 	if is_ship():
@@ -1302,11 +1509,12 @@ func _draw_rules() -> void:
 		keys.append("RULES_SHIP_2")
 		if session.ships_max > 0:
 			keys.append("RULES_SHIP_3")
-	if session.feed == RoomSession.FEED_ADVERSARY:
-		keys.append("RULES_ADVERSARY")
+	var boss_rules := "RULES_" + String(session.boss).to_upper()
+	if session.boss != RoomSession.BOSS_NONE:
+		keys.append(boss_rules)
 	var gap := 10.0 if keys.size() < 6 else 4.0
 	for i in keys.size():
-		var color := Palette.BAD.lightened(0.2) if keys[i] == "RULES_ADVERSARY" else Palette.TEXT
+		var color := Palette.BAD.lightened(0.2) if keys[i] == boss_rules else Palette.TEXT
 		_text("%d." % (i + 1), Vector2(x, y), S, Palette.GOLD)
 		draw_multiline_string(font, Vector2(x + 20, y), tr(keys[i]), HORIZONTAL_ALIGNMENT_LEFT, w - 20, S, 3, color)
 		# The real wrapped height, so the next line never overlaps (wraps differ by language).
@@ -1326,7 +1534,7 @@ func _draw_boss_intro() -> void:
 	var c := HORIZONTAL_ALIGNMENT_CENTER
 	# The face grows in and keeps breathing.
 	var face := 96.0 * (0.6 + 0.4 * Anim.ease_out_back(t / 0.45)) * (1.0 + 0.03 * sin(time * 3.0))
-	Icons.draw_boss(self, Rect2(Vector2(320, 104) - Vector2(face, face) * 0.5, Vector2(face, face)), Anim.clamp01(t / 0.2))
+	Icons.draw_boss(self, Rect2(Vector2(320, 104) - Vector2(face, face) * 0.5, Vector2(face, face)), Anim.clamp01(t / 0.2), session.boss)
 	# "BOSS" slams down with a little shake.
 	var slam := Anim.clamp01((t - 0.3) / 0.2)
 	if slam > 0.0:
@@ -1335,13 +1543,14 @@ func _draw_boss_intro() -> void:
 		_text(tr("BOSS_LABEL"), Vector2(0, 196) + jitter, L, Color(Palette.BAD, slam), c, 640)
 		draw_set_transform_matrix(Transform2D.IDENTITY)
 	var a := Anim.clamp01((t - 0.55) / 0.3)
-	_text(tr("BOSS_NAME_ADVERSARY"), Vector2(0, 222), M, Color(Palette.GOLD, a), c, 640)
+	var boss := String(session.boss).to_upper()
+	_text(tr("BOSS_NAME_" + boss), Vector2(0, 222), M, Color(Palette.GOLD, a), c, 640)
 	# One under another by their real wrapped height (wraps differ by language).
 	var y := 248.0
 	var lines: Array = [
-		[tr("BOSS_INTRO_1"), Palette.TEXT],
-		[tr("BOSS_INTRO_2") % session.strike_every, Palette.TEXT],
-		[tr("BOSS_INTRO_3"), Palette.CHIPS.lightened(0.2)],
+		[tr("BOSS_INTRO_%s_1" % boss), Palette.TEXT],
+		[tr("BOSS_INTRO_%s_2" % boss) % session.strike_every, Palette.TEXT],
+		[tr("BOSS_INTRO_SHIELD"), Palette.CHIPS.lightened(0.2)],
 	]
 	for line in lines:
 		draw_multiline_string(font, Vector2(50, y), line[0], c, 540, S, 3, Color(line[1], a))
@@ -1397,6 +1606,52 @@ func _draw_rules_picture_insertion(o: Vector2) -> void:
 	draw_multiline_string(font, Vector2(o.x, o.y + 164), tr("RULES_PIC_INSERTION"), HORIZONTAL_ALIGNMENT_LEFT, 160, S, 2, Palette.SOFT)
 
 
+## Pancake: a stack on a plate (the exit at the bottom); the spatula goes
+## under 9, so 9 and 3 above it turn over and 9 lands on top.
+func _draw_rules_picture_pancake(o: Vector2) -> void:
+	var cx := o.x + 52
+	var values := [3, 9, 1, 5]  # top to bottom
+	for i in values.size():
+		_mini_box(Vector2(cx, o.y + 16 + i * 24), values[i])
+	var plate_y := o.y + 16 + values.size() * 24 - 8
+	draw_dashed_line(Vector2(cx - 40, plate_y), Vector2(cx + 40, plate_y), Palette.GOLD.darkened(0.3), 1.0, 4.0)
+	_text(tr("EXIT"), Vector2(cx - 40, plate_y + 16), S, Palette.GOLD.darkened(0.15), HORIZONTAL_ALIGNMENT_CENTER, 80)
+	# The spatula under 9, its handle to the right.
+	var sy := o.y + 16 + 24 + 12
+	draw_rect(Rect2(cx - 30, sy - 1, 60, 3), Palette.GOLD)
+	draw_line(Vector2(cx + 30, sy), Vector2(cx + 48, sy - 5), Palette.GOLD, 2.0)
+	draw_rect(Rect2(cx + 46, sy - 9, 12, 5), Palette.GOLD.darkened(0.25))
+	_marker(Vector2(cx - 30, sy))
+	# What turns over: 3 and 9.
+	var bx := cx + 40
+	draw_line(Vector2(bx, o.y + 6), Vector2(bx, sy - 8), Palette.GOLD, 2.0)
+	draw_colored_polygon(PackedVector2Array([Vector2(bx - 4, o.y + 10), Vector2(bx + 4, o.y + 10), Vector2(bx, o.y + 4)]), Palette.GOLD)
+	draw_colored_polygon(PackedVector2Array([Vector2(bx - 4, sy - 10), Vector2(bx + 4, sy - 10), Vector2(bx, sy - 4)]), Palette.GOLD)
+	draw_multiline_string(font, Vector2(o.x, o.y + 164), tr("RULES_PIC_PANCAKE"), HORIZONTAL_ALIGNMENT_LEFT, 160, S, 2, Palette.SOFT)
+
+
+## Quick: a segment 5 2 4 8 (exit on top) with pivot 4, and after the split
+## 2 4 5 8: 2 went above the pivot, 4 is in its place.
+func _draw_rules_picture_quick(o: Vector2) -> void:
+	var before := [5, 2, 4, 8]
+	var after := [2, 4, 5, 8]
+	var lx := o.x + 32
+	var rx := o.x + 128
+	for cx in [lx, rx]:
+		draw_dashed_line(Vector2(cx - 30, o.y + 6), Vector2(cx + 30, o.y + 6), Palette.GOLD.darkened(0.3), 1.0, 4.0)
+		_text(tr("EXIT"), Vector2(cx - 30, o.y), S, Palette.GOLD.darkened(0.15), HORIZONTAL_ALIGNMENT_CENTER, 60)
+	for i in before.size():
+		_mini_box(Vector2(lx, o.y + 26 + i * 24), before[i], Palette.GOLD if before[i] == 4 else Color(0, 0, 0, 0))
+		_mini_box(Vector2(rx, o.y + 26 + i * 24), after[i], Palette.GOLD if after[i] == 4 else Color(0, 0, 0, 0))
+	# The segment's bracket before the split, and an arrow to the result.
+	var by := o.y + 14
+	draw_line(Vector2(lx + 34, by + 2), Vector2(lx + 34, by + 94), Palette.SOFT.darkened(0.2), 2.0)
+	var ay := o.y + 62
+	draw_line(Vector2(lx + 40, ay), Vector2(rx - 38, ay), Palette.GOLD, 2.0)
+	draw_colored_polygon(PackedVector2Array([Vector2(rx - 36, ay), Vector2(rx - 43, ay - 4), Vector2(rx - 43, ay + 4)]), Palette.GOLD)
+	draw_multiline_string(font, Vector2(o.x, o.y + 164), tr("RULES_PIC_QUICK"), HORIZONTAL_ALIGNMENT_LEFT, 160, S, 2, Palette.SOFT)
+
+
 ## An elbow arrow from the key (at key_y) up to the gap (at gap_y).
 func _insert_arrow(from_x: float, lane_x: float, key_y: float, gap_y: float) -> void:
 	var lx := maxf(from_x, lane_x) + 8.0
@@ -1415,7 +1670,7 @@ func _tank_bottom() -> float:
 
 
 func _slot_pos(i: int) -> Vector2:
-	if is_bubble():
+	if _bottom_up():
 		return Vector2(TANK_CX, _tank_bottom() - (i + 0.5) * SLOT_H)
 	return Vector2(TANK_CX, TANK_TOP + (i + 0.5) * SLOT_H)
 

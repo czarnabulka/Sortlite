@@ -288,4 +288,4 @@ func test_boss_shield_lets_phase_two_points_through() -> void:
 func test_rooms_without_a_boss_have_no_shield() -> void:
 	for key in Run.ROOMS:
 		var s := RoomSession.new(1, RoomSession.ArrivalMode.TURNS, [], Run.session_config(Run.ROOMS[key], true))
-		check_eq(s.room.score_cap >= 0, key == &"boss_adversary", "%s shield" % key)
+		check_eq(s.room.score_cap >= 0, Run.ROOMS[key]["kind"] == Run.BOSS, "%s shield" % key)

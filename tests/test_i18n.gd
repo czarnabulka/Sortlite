@@ -104,7 +104,15 @@ func test_built_keys_exist() -> void:
 	for id in Algorithms.ALL:
 		for i in range(1, 5):
 			check(rows.has("RULES_%s_%d" % [String(id).to_upper(), i]), "rules %s %d" % [id, i])
-	for key in ["HINT_ADVERSARY", "WRONG_INSERT", "WRONG_SWAP", "RULES_ADVERSARY", "HELP_RULES"]:
+	for id in Algorithms.ALL:
+		check(rows.has("HINT_SHIP_" + String(id).to_upper()), "ship hint %s" % id)
+	for boss in RoomSession.BOSSES:
+		var b := String(boss).to_upper()
+		for key in ["BOSS_NAME_", "BOSS_HP_", "BOSS_STRIKES_IN_", "RULES_"]:
+			check(rows.has(key + b), "%s%s" % [key, b])
+		for i in [1, 2]:
+			check(rows.has("BOSS_INTRO_%s_%d" % [b, i]), "boss intro %s %d" % [b, i])
+	for key in ["HINT_ADVERSARY", "WRONG_INSERT", "WRONG_SWAP", "WRONG_FLIP", "HELP_RULES", "BOSS_INTRO_SHIELD"]:
 		check(rows.has(key), key)
 
 

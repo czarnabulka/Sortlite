@@ -17,6 +17,8 @@ $GODOT --headless --path . --import                         # after adding a cla
 $GODOT --headless --path . -s res://tests/run_tests.gd      # tests; exit 0 = all passed
 $GODOT --headless --path . -s res://sim/sim_rooms.gd -- --ship              # balance: greedy vs smart bot per room
 $GODOT --headless --path . -s res://sim/sim_rooms.gd -- --ship --only boss_adversary --seeds 300
+$GODOT --headless --path . -s res://sim/sim_rooms.gd -- --ship --only "*quick" --items 0,5   # floor 2 with a floor-2 hand
+$GODOT --headless --path . -s res://sim/sim_rooms.gd -- --ship --build sieve,doubler,bubble_pump,power_tower
 $GODOT --path . -s res://tools/shot.gd -- --screen room --room 1 --lang pl --out <png>   # screenshot (opens a window)
 ```
 
@@ -30,7 +32,10 @@ not the repo.
 - A rules or balance change: run the simulator. A ship room is tuned when the
   greedy bot (ships at once) usually misses the target and the smart bot
   (waits for better hands) usually makes it; today greedy wins 2–27% and smart
-  67–84% with no items. Update the balance chart in the design document.
+  67–84% with no items. Floor 2 rooms are tuned the same way but with 5
+  random items (`--items 5`), since a player holds 5–6 by then; watch the
+  one-shot column (a single shipment clears the room). Update the balance
+  chart in the design document.
 - A UI change: take screenshots in English and Polish and look at them.
   Polish text is longer and wraps differently; check for overlaps and cut
   lines.
@@ -57,12 +62,17 @@ not the repo.
   every file loads, every played name exists and no file goes unused. You
   cannot hear the sounds: pick them by name, length and loudness (the 8-bit
   jingles by their pitch going up or down), and say the user should listen.
+  Set a new row's dB so the played loudness (the file's RMS + the dB) sits in
+  the bands described at the top of `ui/sfx.gd`; a player found the first
+  levels painful. Measure a file by decoding it with
+  `AudioStreamPlayback.mix_audio` in a scratch script.
 - Icons are 16×16 cells of Kenney's 1-Bit Pack (`assets/icons/kenney_1bit.png`,
   49×22 cells), tinted when drawn; `ui/icons.gd` maps items, the boss and UI
   glyphs to cells. Check a new cell by rendering it: neighbouring cells are
   easy to mix up. `tests/test_icons.gd` checks every item has a non-empty cell.
 - `tools/shot.gd -- --items a,b,c` gives the run items; `--screen reward`
-  shows the item choice.
+  shows the item choice; `--seed 3` fixes the run (seed 3: floor 2 opens with
+  a Quick fight and has the Quick elite, `--room 4` / `--room 6`).
 - Files use LF line endings. Python on Windows writes CRLF in text mode, so
   open files with `newline=""` (or `"\n"`) when editing them from a script.
 - Player settings are saved in `user://settings.cfg` on the user's machine.
@@ -93,12 +103,15 @@ only apply to this machine go in `CLAUDE.local.md`.
 
 ## Where things stand
 
-- Released: 0.2 (shipment limits, boss phase shield). Since then: title
-  screen, settings and pause menu; README rewrite; sound effects with a
-  volume setting, combo and warning sounds, 8-bit jingles, and icons from the
-  1-Bit Pack (sounds not yet listened to by a person); a light nerf of Sieve
-  (half a prime's value) and Doubler (every second number).
-- Open questions: are strong builds rewarded right (after the Sieve and
+- Released: 0.3. Two floors (`Run.FLOORS`): Bubble and Insertion with the
+  Adversary, then Pancake and Quick with the Burnt Stack, floor 2 tuned for
+  a 5-item hand; 6 item slots; title screen, settings and pause menu; sound
+  effects (levels checked by ear) and icons from the 1-Bit Pack.
+- Open questions: Insertion lets a strong build clear a room with one
+  shipment (about 80% on floor 1); Quick's ship decision is weaker than the
+  others' (greedy wins 20–31% with 5 items, even with 4 shipments); are the
+  Burnt Stack's sides readable to players;
+  are strong builds rewarded right (after the Sieve and
   Doubler nerf, Sieve + Doubler + Bubble Pump + Power Tower scores about 3×
   a room's target, was 5×);
   values are 1–12 (patterns would like a wider range); keep or drop classic

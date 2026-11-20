@@ -18,12 +18,19 @@ const BATCH_SIZE := 3
 const FEED_RANDOM := &"random"
 const FEED_ADVERSARY := &"adversary"
 
-## Bosses. The Adversary also strikes: every `strike_every` moves it swaps a
-## sorted neighbour pair (the one nearest the exit), warning one move ahead.
-## If the player moves either element first, the strike misses.
+## Bosses. Every `strike_every` moves a boss strikes, warning one move ahead:
+## - the Adversary swaps the sorted neighbour pair nearest the exit; moving
+##   either element first makes it miss.
+## - the Burnt Stack (a Pancake room where numbers have a burnt side)
+##   scorches the clean number nearest the exit; moving or shipping it first
+##   makes it miss. Enraged, it sends burnt newcomers.
+## Either throws in an extra number when it has nothing to aim at.
 const BOSS_NONE := &""
 const BOSS_ADVERSARY := &"adversary"
+const BOSS_BURNT := &"burnt"
+const BOSSES: Array[StringName] = [BOSS_ADVERSARY, BOSS_BURNT]
 const STRIKE_SWAP := &"swap"
+const STRIKE_SCORCH := &"scorch"
 const STRIKE_THROW := &"throw"
 
 const DEFAULTS := {
@@ -70,8 +77,10 @@ var strike_every: int
 var moves_to_strike := 0
 ## What the boss will do after the next move ("" = not aiming yet).
 var strike_mode: StringName = &""
-## For a swap: the two element uids it is aiming at.
+## The element uids it is aiming at (two for a swap, one for a scorch).
 var strike_uids: Array[int] = []
+## For a scorch: where the aimed number was; it misses if that changed.
+var strike_index := -1
 ## Second phase: at half of the target the boss gets angry. Newcomers come one
 ## move sooner and strikes come one move sooner.
 var enraged := false
@@ -116,6 +125,8 @@ func _init(p_seed: int, p_mode: ArrivalMode, p_items: Array[Item] = [], config: 
 	# enraged, so even the biggest shipment cannot one-shot it.
 	if boss != BOSS_NONE:
 		room.score_cap = enrage_at
+	if boss == BOSS_BURNT and room.algorithm is PancakeAlgorithm:
+		(room.algorithm as PancakeAlgorithm).burnt_sides = true
 	ships_max = room.ships_left
 	next_value = _roll()
 
@@ -205,7 +216,7 @@ func moves_until_arrival() -> int:
 # --- boss -----------------------------------------------------------------------
 
 func _boss_tick() -> void:
-	if boss != BOSS_ADVERSARY:
+	if boss == BOSS_NONE:
 		return
 	if not enraged and room.score >= enrage_at:
 		enraged = true
@@ -223,12 +234,24 @@ func _boss_tick() -> void:
 
 
 ## Warns what the boss will do after the next move: swap the sorted pair
-## nearest the exit, or, when nothing is sorted, throw in an extra number.
+## nearest the exit (Adversary) or scorch the clean number nearest it (Burnt
+## Stack); with nothing to aim at, throw in an extra number.
 func _aim() -> void:
 	strike_uids.clear()
+	strike_index = -1
 	strike_mode = STRIKE_THROW
 	var board := room.board
 	var exit_low := room.algorithm.surface_index(board) == 0 if not board.is_empty() else true
+	if boss == BOSS_BURNT:
+		for k in board.size():
+			var i := k if exit_low else board.size() - 1 - k
+			if not board.cells[i].has_marker(Element.BURNT):
+				strike_mode = STRIKE_SCORCH
+				strike_uids = [board.cells[i].uid]
+				strike_index = i
+				break
+		bus.emit(Events.BOSS_AIM, {"room": room, "mode": strike_mode, "uids": strike_uids.duplicate()})
+		return
 	var best := -1
 	for j in range(board.size() - 1):
 		if board.value_at(j) < board.value_at(j + 1):
@@ -251,6 +274,9 @@ func _strike() -> void:
 			if lives <= 0:
 				room.fail()
 		return
+	if mode == STRIKE_SCORCH:
+		_scorch()
+		return
 	if mode != STRIKE_SWAP:
 		return
 	# Swaps the aimed pair if it is still side by side and still sorted.
@@ -271,6 +297,21 @@ func _strike() -> void:
 		bus.emit(Events.BOSS_DODGED, {"room": room})
 
 
+## Burns the aimed number if it is still where it was and still clean.
+func _scorch() -> void:
+	var board := room.board
+	var uid := strike_uids[0] if not strike_uids.is_empty() else -1
+	strike_uids.clear()
+	var i := strike_index
+	strike_index = -1
+	if i >= 0 and i < board.size() and board.cells[i].uid == uid and not board.cells[i].has_marker(Element.BURNT):
+		board.cells[i].turn_over()
+		bus.emit(Events.BOSS_STRIKE, {"room": room, "mode": STRIKE_SCORCH, "index": i})
+		room.refresh()
+	else:
+		bus.emit(Events.BOSS_DODGED, {"room": room})
+
+
 func is_aiming() -> bool:
 	return strike_mode != &""
 
@@ -279,11 +320,19 @@ func is_aiming_pair() -> bool:
 	return strike_mode == STRIKE_SWAP
 
 
-## Newcomers sent by the Adversary are cursed: they score half.
+## Aiming at numbers on the board (a swap or a scorch), not a throw.
+func is_aiming_cells() -> bool:
+	return strike_mode == STRIKE_SWAP or strike_mode == STRIKE_SCORCH
+
+
+## Newcomers sent by the Adversary are cursed: they score half. The enraged
+## Burnt Stack sends them burnt side up.
 func _on_arrive(data: Dictionary) -> void:
+	var e: Element = data["element"]
 	if feed == FEED_ADVERSARY:
-		var e: Element = data["element"]
 		e.markers[Element.CURSED] = true
+	if boss == BOSS_BURNT and enraged:
+		e.markers[Element.BURNT] = true
 
 
 ## An empty board has no moves, so nothing could ever happen in TURNS mode.

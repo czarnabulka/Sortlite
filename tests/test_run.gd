@@ -25,14 +25,20 @@ func test_run_starts_with_an_offer() -> void:
 	check_eq(ids.size(), Run.OFFER_SIZE, "no duplicates")
 
 
-func test_floor_has_both_algorithms_and_a_boss() -> void:
+func test_floors_have_their_algorithms_and_a_boss() -> void:
 	for s in 20:
 		var run := Run.new(s)
-		var algos := {}
-		for r in run.plan:
-			algos[r["algorithm"]] = true
-		check_eq(algos.size(), 2, "seed %d: both algorithms" % s)
-		check_eq(run.plan.back()["kind"], Run.BOSS, "seed %d: boss last" % s)
+		check_eq(run.plan.size(), 4 * Run.FLOORS.size(), "seed %d: four rooms a floor" % s)
+		var first := {}
+		for r in run.plan.slice(0, 4):
+			first[r["algorithm"]] = true
+			check_eq(r["floor"], 1, "seed %d: floor 1" % s)
+		check(first.has(Algorithms.BUBBLE) and first.has(Algorithms.INSERTION), "seed %d: floor 1 has both" % s)
+		var second: Array = run.plan.slice(4, 8).map(func(r: Dictionary) -> StringName: return r["algorithm"])
+		check(second.has(Algorithms.PANCAKE) and second.has(Algorithms.QUICK), "seed %d: floor 2 has Pancake and Quick" % s)
+		for i in [3, 7]:
+			check_eq(run.plan[i]["kind"], Run.BOSS, "seed %d: boss closes floor %d" % [s, i / 4 + 1])
+		check_eq(run.plan[7]["boss"], RoomSession.BOSS_BURNT, "seed %d: the Burnt Stack last" % s)
 
 
 func test_taking_an_item_starts_the_room_with_it() -> void:
@@ -63,23 +69,27 @@ func test_reroll_and_heal_cost_bits() -> void:
 	check_eq(run.lives, 3, "life back")
 
 
-func test_bot_clears_the_floor_and_items_follow() -> void:
+func test_bot_clears_floors_and_items_follow() -> void:
+	var floor_1 := 0
 	var wins := 0
 	for s in 20:
 		var run := Run.new(s)
 		var guard := 0
-		while run.phase != Run.Phase.WON and run.phase != Run.Phase.LOST and guard < 10:
+		while run.phase != Run.Phase.WON and run.phase != Run.Phase.LOST and guard < 20:
 			guard += 1
-			if run.phase == Run.Phase.REWARD:
-				run.take(0)
+			if run.phase == Run.Phase.REWARD and not run.take(0):
+				run.skip()
 			_play_room(run)
+		if run.cleared >= 4:
+			floor_1 += 1
+			check_eq(run.items.size(), mini(run.cleared + 1, Run.MAX_SLOTS), "seed %d: one item per room" % s)
+			check(run.bits > 0, "seed %d: earned bits" % s)
 		if run.phase == Run.Phase.WON:
 			wins += 1
-			check_eq(run.items.size(), run.plan.size(), "seed %d: one item per room" % s)
-			check(run.bits > 0, "seed %d: earned bits" % s)
-	# The smart bot taking the first offer wins about 2/3 of floors (66 of
-	# seeds 0-99); below 12/20 something got much harder.
-	check(wins >= 12, "a perfect bot wins most floors (%d/20)" % wins)
+	# The smart bot taking the first offer clears floor 1 in about 2/3 of runs
+	# (66 of seeds 0-99); below 12/20 something got much harder.
+	check(floor_1 >= 12, "a perfect bot clears floor 1 in most runs (%d/20)" % floor_1)
+	check(wins >= 4, "and sometimes the whole run (%d/20)" % wins)
 
 
 func test_lost_room_ends_the_run() -> void:
@@ -106,11 +116,11 @@ func test_items_leave_the_old_bus() -> void:
 func test_offer_skips_items_for_algorithms_no_longer_ahead() -> void:
 	for s in 30:
 		var run := Run.new(s)
-		run.cleared = run.plan.size() - 1  # only the boss (Bubble) is left
+		run.cleared = run.plan.size() - 1  # only the last boss (Pancake) is left
 		run._make_offer()
 		for item in run.offer:
-			check(item.algorithm == &"" or item.algorithm == Algorithms.BUBBLE,
-					"seed %d: %s is useless in a Bubble room" % [s, item.id])
+			check(item.algorithm == &"" or item.algorithm == Algorithms.PANCAKE,
+					"seed %d: %s is useless in a Pancake room" % [s, item.id])
 
 
 func test_full_slots_refuse_a_pick_but_allow_a_skip() -> void:

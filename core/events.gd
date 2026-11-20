@@ -12,6 +12,8 @@ const MOVE := &"move"
 ## Algorithm-specific move kinds, emitted together with MOVE.
 const SWAP := &"swap"
 const INSERT := &"insert"
+const FLIP := &"flip"
+const PARTITION := &"partition"
 ## Ship rooms: the player sends the ready run out. Move: {"type": SHIP, "count": n}.
 const SHIP := &"ship"
 ## A shipment is about to score. data: room, count, values, mult, patterns.

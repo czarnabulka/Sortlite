@@ -4,7 +4,9 @@ extends RefCounted
 
 const BUBBLE := &"bubble"
 const INSERTION := &"insertion"
-const ALL: Array[StringName] = [BUBBLE, INSERTION]
+const PANCAKE := &"pancake"
+const QUICK := &"quick"
+const ALL: Array[StringName] = [BUBBLE, INSERTION, PANCAKE, QUICK]
 
 
 static func make(id: StringName) -> Algorithm:
@@ -13,5 +15,9 @@ static func make(id: StringName) -> Algorithm:
 			return BubbleAlgorithm.new()
 		INSERTION:
 			return InsertionAlgorithm.new()
+		PANCAKE:
+			return PancakeAlgorithm.new()
+		QUICK:
+			return QuickAlgorithm.new()
 	push_error("Algorithms: unknown id '%s'" % id)
 	return BubbleAlgorithm.new()

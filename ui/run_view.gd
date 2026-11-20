@@ -94,7 +94,9 @@ func _show_phase() -> void:
 		var algo: StringName = run.current_room()["algorithm"]
 		var first_time := not seen_rules.has(algo)
 		seen_rules[algo] = true
-		room_view.set_session(run.session, run.cleared + 1, run.plan.size(), run.current_room()["kind"], run.bits, first_time)
+		var rooms := run.floor_rooms()
+		room_view.set_session(run.session, run.cleared - rooms[0] + 1, rooms.size(), run.current_room()["kind"], run.bits,
+				first_time, run.floor_no())
 	queue_redraw()
 
 
@@ -257,6 +259,7 @@ func _draw() -> void:
 	draw_rect(Rect2(0, 0, 640, 360), Palette.BG)
 	var head := Anim.ease_out_cubic(screen_t / 0.3)
 	_text("ROGUESORT", Vector2(16, 24), M, _a(Palette.GOLD, head))
+	_text(tr("FLOOR_N") % run.floor_no(), Vector2(0, 24), M, _a(Palette.TEXT, head), HORIZONTAL_ALIGNMENT_CENTER, 640)
 	_text("seed %d" % run.seed_value, Vector2(16, 24), S, _a(Palette.MUTED, head), HORIZONTAL_ALIGNMENT_RIGHT, 608)
 	_draw_map(46)
 	match run.phase:
@@ -266,19 +269,21 @@ func _draw() -> void:
 			_draw_end()
 
 
-## The floor: one box per room, done ones dimmed, the next one outlined.
-## Boxes drop in one after another.
+## The current floor: one box per room, done ones dimmed, the next one
+## outlined. Boxes drop in one after another.
 func _draw_map(y: float) -> void:
-	var n := run.plan.size()
+	var rooms := run.floor_rooms()
+	var n := rooms.size()
 	var w := 128.0
 	var gap := 22.0
 	var x0 := (640.0 - (n * w + (n - 1) * gap)) * 0.5
-	for i in n:
-		var p := Anim.stagger(screen_t, i, 0.06, 0.3)
+	for k in n:
+		var i: int = rooms[k]
+		var p := Anim.stagger(screen_t, k, 0.06, 0.3)
 		var a := p
 		var room: Dictionary = run.plan[i]
-		var r := Rect2(x0 + i * (w + gap), y - 16.0 * (1.0 - Anim.ease_out_cubic(p)), w, 42)
-		if i > 0:
+		var r := Rect2(x0 + k * (w + gap), y - 16.0 * (1.0 - Anim.ease_out_cubic(p)), w, 42)
+		if k > 0:
 			draw_line(Vector2(r.position.x - gap, r.get_center().y), Vector2(r.position.x, r.get_center().y), _a(Palette.PANEL_EDGE, a), 1.0)
 		var done := i < run.cleared
 		var next := i == run.cleared and run.phase == Run.Phase.REWARD
@@ -297,7 +302,7 @@ func _draw_map(y: float) -> void:
 			_text(str(run.scores[i]), Vector2(r.position.x, r.position.y + 18), S, _a(Palette.GOOD, a), HORIZONTAL_ALIGNMENT_RIGHT, w - 8)
 		elif kind == Run.BOSS:
 			var face := 26.0 * (1.0 + (0.08 * sin(time * 5.0) if next else 0.0))
-			Icons.draw_boss(self, Rect2(r.end.x - 8 - face, r.get_center().y - face * 0.5, face, face), a)
+			Icons.draw_boss(self, Rect2(r.end.x - 8 - face, r.get_center().y - face * 0.5, face, face), a, room.get("boss", &"adversary"))
 
 
 func _draw_reward() -> void:
@@ -305,6 +310,8 @@ func _draw_reward() -> void:
 	if run.slots_full():
 		var c := Palette.BAD.lightened(0.15 + 0.4 * full_flash)
 		_text(tr("SLOTS_FULL"), Vector2(0, 108), M, _a(c, title_a), HORIZONTAL_ALIGNMENT_CENTER, 640)
+	elif run.floor_starts():
+		_text(tr("FLOOR_START") % run.floor_no(), Vector2(0, 108), M, _a(Palette.GOLD, title_a), HORIZONTAL_ALIGNMENT_CENTER, 640)
 	elif run.current_room()["kind"] == Run.BOSS:
 		# The last pick before the boss says so, in red.
 		var pulse := 0.75 + 0.25 * sin(time * 4.0)
@@ -363,11 +370,12 @@ func _draw_end() -> void:
 	var title_s := 0.6 + 0.4 * Anim.ease_out_back((screen_t - 0.2) / 0.4)
 	var title_a := Anim.clamp01((screen_t - 0.2) / 0.15)
 	draw_set_transform_matrix(Anim.around(Vector2(320, 140), title_s))
-	_text(tr("FLOOR_CLEARED") if won else tr("RUN_OVER"), Vector2(0, 150), L, _a(Palette.GOLD if won else Palette.BAD, title_a), c, 640)
+	_text(tr("RUN_CLEARED") if won else tr("RUN_OVER"), Vector2(0, 150), L, _a(Palette.GOLD if won else Palette.BAD, title_a), c, 640)
 	draw_set_transform_matrix(Transform2D.IDENTITY)
 	var a1 := Anim.clamp01((screen_t - 0.5) / 0.3)
 	if not won:
-		_text(tr("ROOM_REACHED") % [run.cleared + 1, run.plan.size()], Vector2(0, 176), S, _a(Palette.SOFT, a1), c, 640)
+		var rooms := run.floor_rooms()
+		_text(tr("ROOM_REACHED") % [run.floor_no(), run.cleared - rooms[0] + 1, rooms.size()], Vector2(0, 176), S, _a(Palette.SOFT, a1), c, 640)
 	var total := 0
 	for s in run.scores:
 		total += s

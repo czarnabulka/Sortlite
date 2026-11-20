@@ -9,6 +9,8 @@ var markers: Dictionary = {}  # StringName -> Variant
 
 ## Sent by a boss: scores half.
 const CURSED := &"cursed"
+## Burnt side up (the Burnt Stack boss): scores half.
+const BURNT := &"burnt"
 
 
 func _init(p_value: int, p_uid: int) -> void:
@@ -18,6 +20,14 @@ func _init(p_value: int, p_uid: int) -> void:
 
 func has_marker(marker: StringName) -> bool:
 	return markers.has(marker)
+
+
+## Flips the number over: burnt side up becomes clean side up and back.
+func turn_over() -> void:
+	if markers.has(BURNT):
+		markers.erase(BURNT)
+	else:
+		markers[BURNT] = true
 
 
 func _to_string() -> String:

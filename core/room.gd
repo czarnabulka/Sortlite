@@ -161,6 +161,8 @@ static func element_points(e: Element) -> int:
 	var base := e.value * BASE_POINTS
 	if e.has_marker(Element.CURSED):
 		base = int(base / 2.0)
+	if e.has_marker(Element.BURNT):
+		base = int(base / 2.0)
 	return base
 
 

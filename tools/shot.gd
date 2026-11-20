@@ -6,7 +6,7 @@ extends SceneTree
 ##   godot --path . -s res://tools/shot.gd -- --screen room --room 1 --moves 8 --lang pl --out shot.png
 ##
 ## --screen   title | settings | pause | room | reward (default room)
-## --room N   room of the floor plan, 0..3 (3 = the boss); room and pause only
+## --room N   room of the run plan, 0..7 (3 and 7 = the bosses, 4..7 = floor 2); room and pause only
 ## --moves N  moves the smart bot plays first (default 6)
 ## --items a,b,c   item ids the run holds (room and reward screens)
 ## --rules / --help / --intro   open the rules card / controls card / boss card

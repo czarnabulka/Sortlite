@@ -24,14 +24,18 @@ const ITEMS := {
 	&"express_lane": {"glyph": Vector2i(24, 12), "bg": "9a3f6b", "fg": "ffd1ea"},  # an arrow up
 }
 
-## The Adversary.
-const BOSS := {"glyph": Vector2i(34, 12), "bg": "3a1418", "fg": "f2d36b"}  # a skull
+## Boss id (RoomSession.BOSSES) -> its face.
+const BOSSES := {
+	&"adversary": {"glyph": Vector2i(34, 12), "bg": "3a1418", "fg": "f2d36b"},  # a skull
+	&"burnt": {"glyph": Vector2i(14, 11), "bg": "3a2418", "fg": "ffb46b"},  # a fire on a grill
+}
 
 ## Plain glyphs for the interface, drawn in any colour.
 const GLYPHS := {
 	&"heart": Vector2i(39, 10),
 	&"heart_empty": Vector2i(40, 10),
 	&"coin": Vector2i(41, 3),
+	&"flame": Vector2i(15, 10),
 }
 
 
@@ -39,8 +43,8 @@ static func draw(ci: CanvasItem, id: StringName, r: Rect2, alpha := 1.0) -> void
 	_draw_tile(ci, ITEMS.get(id, {}), r, alpha)
 
 
-static func draw_boss(ci: CanvasItem, r: Rect2, alpha := 1.0) -> void:
-	_draw_tile(ci, BOSS, r, alpha)
+static func draw_boss(ci: CanvasItem, r: Rect2, alpha := 1.0, boss: StringName = &"adversary") -> void:
+	_draw_tile(ci, BOSSES.get(boss, BOSSES[&"adversary"]), r, alpha)
 
 
 ## One glyph, no tile behind it.

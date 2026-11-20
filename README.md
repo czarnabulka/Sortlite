@@ -5,7 +5,7 @@ real sorting algorithms, then choose when the sorted ones leave: a shipment
 scores like a poker hand, and the items you pick between rooms build on each
 other.
 
-Version 0.2 · Godot 4.7, GDScript · English and Polish ·
+Version 0.3 · Godot 4.7, GDScript · English and Polish ·
 [design document](https://claude.ai/artifact/5ETaojyCo7PVF7KUTtAXea)
 
 ## Run it
@@ -21,18 +21,24 @@ settings (language, sound volume, CRT effect, fullscreen, arrivals by moves
 or by time) and quit. ESC during a run opens the pause menu.
 
 Options after `--`, for testing: `--seed 123` replays a run, `--demo` lets the
-bot play, `--skip 3` jumps to a room (3 = the boss); these three start a run
-at once. `--lang pl` picks the language for one launch, and `--classic` plays
-the older rooms where sorted numbers leave by themselves.
+bot play, `--skip 3` jumps to a room (0–7; 3 and 7 are the bosses); these
+three start a run at once. `--lang pl` picks the language for one launch, and
+`--classic` plays the older rooms where sorted numbers leave by themselves.
 
 ## How it plays
 
-- A run is one floor of four rooms: a Bubble fight, an Insertion fight, an
-  elite and the boss. Before each room you pick 1 of 3 items (up to 5; slot
-  order is the order they act in).
+- A run is two floors of four rooms: two fights, an elite and a boss. Floor 1
+  has Bubble and Insertion rooms and the Adversary; floor 2 brings Pancake,
+  Quick and the Burnt Stack. Before each room you pick 1 of 3 items (up to
+  6; slot order is the order they act in).
 - **Bubble**: swap neighbours; the largest number is ready at the exit.
   **Insertion**: insert the gold key into the sorted part; every number it
   passes costs a move; the smallest number is ready at the exit.
+  **Pancake**: flip a number over together with everything above it; the
+  exit is at the bottom, where the largest number is ready.
+  **Quick**: pick a pivot in a segment not yet in place; the segment splits
+  around it (1 move per other number in it) and the pivot lands in place;
+  the smallest number is ready at the exit.
 - Ready numbers wait at the exit. **E** ships them as one hand (1 move),
   **Q** ships fewer. Each number scores `value × 10 × mult`; the mult is the
   hand's length plus a bonus per number for each pattern:
@@ -44,19 +50,22 @@ the older rooms where sorted numbers leave by themselves.
   | all prime / Fibonacci / powers of 2 / squares (3+) | 2 3 5 | +2 each |
   | all even / all odd (3+) | 2 6 8 | +1 |
 
-- Every room has a score target, a move budget and 5–7 shipments. Running out
+- Every room has a score target, a move budget and 4–7 shipments. Running out
   of shipments below the target loses the room. New numbers keep arriving, and
   one that arrives in a full column costs a life (3 per run).
-- The boss, the Adversary, sends worst-case numbers that score half, swaps a
-  sorted pair every few moves (move it to dodge), gets faster at half HP, and
-  its shield stops any single shipment from taking more than half its HP.
+- Each floor ends with a boss. The Adversary sends worst-case numbers that
+  score half and swaps a sorted pair every few moves (move it to dodge). The
+  Burnt Stack gives every number a burnt side that a flip turns over (burnt
+  side up scores half) and scorches the clean number nearest the exit (move or
+  ship it to dodge). Both get faster at half HP, and a shield stops any single
+  shipment from taking more than half their HP.
 
 ## Controls
 
 | Key | Action |
 |-----|--------|
-| W / S, arrows, mouse wheel | pick a pair (Bubble) or a place for the key (Insertion) |
-| SPACE, click | swap / insert |
+| W / S, arrows, mouse wheel | pick a pair (Bubble), a place for the key (Insertion), where the spatula goes (Pancake) or a pivot (Quick) |
+| SPACE, click | swap / insert / flip / split |
 | E | ship the ready numbers |
 | Q / right-click | ship fewer / ship up to the clicked number |
 | F | let the next number in now |

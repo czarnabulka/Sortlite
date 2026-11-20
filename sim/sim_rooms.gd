@@ -11,9 +11,17 @@ extends SceneTree
 ## In a ship room, greedy should usually miss the target and smart should
 ## usually make it: that gap is what the ship decision is worth.
 
-## Options after `--`: `--seeds 100` (default 300), `--only fight_bubble`,
-## `--ship` (skip the classic rows).
+## Options after `--`: `--seeds 100` (default 300), `--only fight_bubble`
+## (or a prefix with `*`: `--only "*quick"`), `--ship` (skip the classic rows),
+## `--items 0,2` (how many random items, one row each; default 0,2). Items are
+## drawn from those that work in the room's algorithm. By floor 2 a player
+## holds 4-5 items: `--items 4,5`. `--build sieve,doubler` plays a fixed
+## build instead (in that slot order), to see what a chosen build does.
+##
+## "one-shot" is the share of rooms where a single shipment scored the whole
+## target: a room that one hand can clear has no ship decision left.
 var seeds := 300
+var build: Array[StringName] = []
 
 
 func _initialize() -> void:
@@ -25,10 +33,21 @@ func _initialize() -> void:
 	i = args.find("--only")
 	if i >= 0 and i + 1 < args.size():
 		only = args[i + 1]
+	var counts: Array[int] = [0, 2]
+	i = args.find("--items")
+	if i >= 0 and i + 1 < args.size():
+		counts.clear()
+		for n in args[i + 1].split(",", false):
+			counts.append(int(n))
+	i = args.find("--build")
+	if i >= 0 and i + 1 < args.size():
+		for id in args[i + 1].split(",", false):
+			build.append(StringName(id))
+		counts = [build.size()]
 	for key: StringName in Run.ROOMS:
-		if only != "" and String(key) != only:
+		if only != "" and not String(key).match(only):
 			continue
-		for n_items in [0, 2]:
+		for n_items in counts:
 			if not args.has("--ship"):
 				_report(key, Run.ROOMS[key], n_items, false, Bots.SMART)
 			_report(key, Run.ROOMS[key], n_items, true, Bots.GREEDY)
@@ -40,15 +59,24 @@ func _report(key: StringName, room_cfg: Dictionary, n_items: int, ship: bool, po
 	var scores: Array[int] = []
 	var lost_lives := 0
 	var beat_target := 0
+	var one_shot := 0
 	var cfg0 := Run.session_config(room_cfg, ship)
 	var target := int(cfg0["target"])
 	for s in seeds:
 		var rng := RandomNumberGenerator.new()
 		rng.seed = s * 7919
 		var items: Array[Item] = []
-		var pool := ItemCatalog.IDS.duplicate()
-		for i in n_items:
+		var pool: Array[StringName] = []
+		for id in ItemCatalog.IDS:
+			var only: StringName = ItemCatalog.make(id).algorithm
+			if only == &"" or only == room_cfg["algorithm"]:
+				pool.append(id)
+		for i in mini(n_items, pool.size()):
 			items.append(ItemCatalog.make(pool.pop_at(rng.randi_range(0, pool.size() - 1))))
+		if not build.is_empty():
+			items.clear()
+			for id in build:
+				items.append(ItemCatalog.make(id))
 		# No target, so the bot plays until the budget runs out; the boss still
 		# gets enraged where the real target would make it.
 		var cfg := cfg0.duplicate()
@@ -58,11 +86,15 @@ func _report(key: StringName, room_cfg: Dictionary, n_items: int, ship: bool, po
 		session.start()
 		var guard := 0
 		var lives_at_target := -1
+		var best_hand := 0
 		while session.is_playing() and guard < 2000:
 			guard += 1
 			var move := Bots.choose_in(session, policy)
+			var before := session.room.score
 			if move.is_empty() or not session.play(move):
 				session.deliver()
+			elif move.get("type") == Events.SHIP:
+				best_hand = maxi(best_hand, session.room.score - before)
 			if lives_at_target < 0 and session.room.score >= target:
 				lives_at_target = session.lives
 		scores.append(session.room.score)
@@ -70,11 +102,13 @@ func _report(key: StringName, room_cfg: Dictionary, n_items: int, ship: bool, po
 		lost_lives += session.max_lives - maxi(lives_at_target if lives_at_target >= 0 else session.lives, 0)
 		if session.room.score >= target:
 			beat_target += 1
+		if best_hand >= target:
+			one_shot += 1
 	scores.sort()
 	var who := ("ship-" + String(policy)) if ship else "classic"
-	print("%-16s %-12s items=%d  p10=%6d p25=%6d p50=%6d p75=%6d  target %5d beaten %3d%%  lives lost %.2f" % [
+	print("%-16s %-12s items=%d  p10=%6d p25=%6d p50=%6d p75=%6d  target %5d beaten %3d%%  one-shot %3d%%  lives lost %.2f" % [
 		key, who, n_items, _p(scores, 0.10), _p(scores, 0.25), _p(scores, 0.50), _p(scores, 0.75),
-		target, int(100.0 * beat_target / seeds), float(lost_lives) / seeds])
+		target, int(100.0 * beat_target / seeds), int(100.0 * one_shot / seeds), float(lost_lives) / seeds])
 
 
 func _p(sorted_values: Array[int], q: float) -> int:

@@ -21,6 +21,10 @@ static func choose(algorithm: Algorithm, board: Board, ready := 0) -> Dictionary
 	match algorithm.id:
 		Algorithms.BUBBLE:
 			return BubbleBot.choose(board, ready)
+		Algorithms.PANCAKE:
+			return PancakeBot.choose(algorithm as PancakeAlgorithm, board, ready)
+		Algorithms.QUICK:
+			return QuickBot.choose(algorithm as QuickAlgorithm, board)
 		Algorithms.INSERTION:
 			# The one right place for the key.
 			for m in algorithm.legal_moves(board):
@@ -80,7 +84,7 @@ static func _smart(session: RoomSession, ready: int) -> Dictionary:
 		return ship
 	if free <= 1:
 		return ship
-	if session.is_aiming_pair() and _aimed_in_run(session, ready):
+	if session.is_aiming_cells() and _aimed_in_run(session, ready):
 		return ship
 	if sort.is_empty():
 		return ship if free == 0 else {}

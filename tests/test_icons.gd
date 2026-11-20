@@ -25,6 +25,11 @@ func test_every_item_has_an_icon() -> void:
 		check(Icons.ITEMS.has(id), "icon for %s" % id)
 
 
+func test_every_boss_has_a_face() -> void:
+	for boss in RoomSession.BOSSES:
+		check(Icons.BOSSES.has(boss), "icon for boss %s" % boss)
+
+
 func test_icon_cells_hold_drawings() -> void:
 	var img := Icons.SHEET.get_image()
 	check(img != null, "sheet loads")
@@ -34,7 +39,8 @@ func test_icon_cells_hold_drawings() -> void:
 		img.decompress()
 	for id: StringName in Icons.ITEMS:
 		_check_cell(img, Icons.ITEMS[id]["glyph"], String(id))
-	_check_cell(img, Icons.BOSS["glyph"], "boss")
+	for boss: StringName in Icons.BOSSES:
+		_check_cell(img, Icons.BOSSES[boss]["glyph"], "boss %s" % boss)
 	for name: StringName in Icons.GLYPHS:
 		_check_cell(img, Icons.GLYPHS[name], String(name))
 
