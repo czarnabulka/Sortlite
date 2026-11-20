@@ -104,10 +104,11 @@ only apply to this machine go in `CLAUDE.local.md`.
 
 ## Where things stand
 
-- Released: 0.3.1. Two floors (`Run.FLOORS`): Bubble and Insertion with the
+- Released: 0.3.2. Two floors (`Run.FLOORS`): Bubble and Insertion with the
   Adversary, then Pancake and Quick with the Burnt Stack, floor 2 tuned for
   a 5-item hand; 13 items (Spatula and Median of Three for the new
-  algorithms) in 6 slots; title screen, settings and pause menu; sound
+  algorithms) in 6 slots, a full hand replaces one; a shop after rooms 2, 4
+  and 6; title screen, settings and pause menu; sound
   effects (levels checked by ear) and icons from the 1-Bit Pack.
 - Open questions: Insertion lets a strong build clear a room with one
   shipment (about 80% on floor 1); Quick's ship decision is weaker than the
