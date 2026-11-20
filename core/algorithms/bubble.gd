@@ -1,6 +1,6 @@
 class_name BubbleAlgorithm
 extends Algorithm
-## Bubble Sort, as in Bubble Sort Quest. The board is a column: index 0 is the
+## Bubble Sort. The board is a column: index 0 is the
 ## bottom, the last index is the top. The only move swaps two neighbours.
 ## The top element leaves when it is the biggest one on the board.
 ## Move: {"type": &"swap", "index": j} swaps j and j + 1.

@@ -10,7 +10,7 @@ enum ArrivalMode { TIME, TURNS }
 
 ## When at most one element is left, the next arrival is a batch of three,
 ## ordered by the algorithm so the newcomers still have to be sorted
-## (a lone newcomer would always surface for free). From Bubble Sort Quest.
+## (a lone newcomer would always surface for free).
 const BATCH_SIZE := 3
 
 ## Where newcomers come from: any value, or the worst value for the

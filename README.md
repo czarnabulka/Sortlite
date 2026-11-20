@@ -1,221 +1,110 @@
-# Roguesort (working title)
+# Roguesort
 
-A puzzle roguelite about sorting, grown out of *Bubble Sort Quest*.
-You put numbers in order with the moves of real algorithms, and items combine
-into synergies like in Isaac and multiply your score like in Balatro.
+A puzzle roguelite about sorting. You put numbers in order with the moves of
+real sorting algorithms, then choose when the sorted ones leave: a shipment
+scores like a poker hand, and the items you pick between rooms build on each
+other.
 
-Design document: https://claude.ai/artifact/5ETaojyCo7PVF7KUTtAXea
+Version 0.2 · Godot 4.7, GDScript · English and Polish ·
+[design document](https://claude.ai/artifact/5ETaojyCo7PVF7KUTtAXea)
 
-Engine: **Godot 4.7**, GDScript.
+## Run it
 
-## How to play
-
-Open the folder in Godot and press F5, or from the command line:
+Open the folder in Godot and press F5, or:
 
 ```bash
 godot --path .
 ```
 
-The game opens on the title screen ([ui/menu_view.gd](ui/menu_view.gd)): a
-new run, a demo where the bot plays, the settings, and quit. ESC during a run
-pauses it and opens the same menu over it (resume, settings, main menu, quit).
+The game opens on the title screen: new run, a demo where the bot plays,
+settings (language, CRT effect, fullscreen, arrivals by moves or by time) and
+quit. ESC during a run opens the pause menu.
 
-For testing, `godot --path . -- --demo` starts a bot run at once (skipping the
-title, like `--seed` and `--skip`), `-- --lang pl` picks the language for a
-single launch, `-- --seed 123` replays a run, and `-- --classic` plays the old
-rooms where sorted numbers leave by themselves.
+Options after `--`, for testing: `--seed 123` replays a run, `--demo` lets the
+bot play, `--skip 3` jumps to a room (3 = the boss); these three start a run
+at once. `--lang pl` picks the language for one launch, and `--classic` plays
+the older rooms where sorted numbers leave by themselves.
 
-## Languages
+## How it plays
 
-The game is in English by default, with Polish as an option in the settings.
-The language, the CRT effect, fullscreen and the arrival mode (every few moves
-or every few seconds) are set in the settings and saved in
-`user://settings.cfg`. All text lives in
-[i18n/strings.csv](i18n/strings.csv): a `keys` column, then `en` and `pl`.
-New text in the game = a new row there and `tr("KEY")` in the code; the
-`tests/test_i18n.gd` test makes sure every key has both languages and that the
-font has every character. After changing the CSV, run `--import` once.
+- A run is one floor of four rooms: a Bubble fight, an Insertion fight, an
+  elite and the boss. Before each room you pick 1 of 3 items (up to 5; slot
+  order is the order they act in).
+- **Bubble**: swap neighbours; the largest number is ready at the exit.
+  **Insertion**: insert the gold key into the sorted part; every number it
+  passes costs a move; the smallest number is ready at the exit.
+- Ready numbers wait at the exit. **E** ships them as one hand (1 move),
+  **Q** ships fewer. Each number scores `value × 10 × mult`; the mult is the
+  hand's length plus a bonus per number for each pattern:
 
-Font: Jersey 10 (OFL), always crisp; text only at 16, 20 and 32 px
-(`S`, `M`, `L` in `ui/room_view.gd`), because smaller sizes lose letters.
+  | Pattern | Example | Bonus per number |
+  |---------|---------|------------------|
+  | straight (3+ consecutive) | 4 5 6 | +2 |
+  | match (2+ equal) | 7 7 | +2 |
+  | all prime / Fibonacci / powers of 2 / squares (3+) | 2 3 5 | +2 each |
+  | all even / all odd (3+) | 2 6 8 | +1 |
+
+- Every room has a score target, a move budget and 5–7 shipments. Running out
+  of shipments below the target loses the room. New numbers keep arriving, and
+  one that arrives in a full column costs a life (3 per run).
+- The boss, the Adversary, sends worst-case numbers that score half, swaps a
+  sorted pair every few moves (move it to dodge), gets faster at half HP, and
+  its shield stops any single shipment from taking more than half its HP.
+
+## Controls
 
 | Key | Action |
 |-----|--------|
-| W / S, arrows, mouse wheel | pick a pair (Bubble) or a spot for the key (Insertion) |
-| SPACE, click the selection | swap / insert |
-| F | let the next element in now |
-| E | ship the ready run (ship rooms) |
+| W / S, arrows, mouse wheel | pick a pair (Bubble) or a place for the key (Insertion) |
+| SPACE, click | swap / insert |
+| E | ship the ready numbers |
 | Q / right-click | ship fewer / ship up to the clicked number |
-| I | room rules card (shows up by itself in the first room of each algorithm) |
-| A / D, click | pick an item between rooms; SPACE takes it |
-| S / R / E | between rooms: skip (+bits), reroll the offer, heal a life |
-| R | new run (on the end screen) |
+| F | let the next number in now |
+| I | rules of this room |
 | H | controls card |
-| F11 | fullscreen (also in the settings) |
-| ESC | pause menu: resume, settings, main menu, quit |
+| A / D, click, SPACE | between rooms: pick and take an item |
+| S / R / E | between rooms: skip (+3 bits), reroll the offer (2 bits), heal a life (5 bits) |
+| R | new run, on the end screen |
+| F11 | fullscreen |
+| ESC | pause menu |
 
-Menus: W / S or arrows to choose, SPACE / ENTER or a click to confirm,
-A / D or arrows to change a setting, ESC to go back.
+## Project layout
 
-## Status: stage 4 (ship rooms)
+| Folder | What it holds |
+|--------|---------------|
+| `core/` | the game rules as plain classes, no scenes: board, room, hands, algorithms, items, run, bots |
+| `ui/` | the screens: title and settings (`menu_view.gd`), run (`run_view.gd`), room (`room_view.gd`), CRT shader |
+| `sim/` | balance simulator |
+| `tests/` | tests that run without a window |
+| `i18n/` | all text: `strings.csv` with `keys`, `en` and `pl` columns |
+| `assets/` | the font |
 
-### Ship rooms: you decide when sorted numbers leave
+Room settings (targets, moves, shipments, arrival pace) live in the `ROOMS`
+table in [core/run.gd](core/run.gd), and the items in
+[core/items/catalog.gd](core/items/catalog.gd).
 
-Sorting alone was trivial: every move had one obvious right answer, and doing
-it also scored. Now sorted numbers at the exit **do not leave by themselves**.
-They glow green (the *ready run*) and wait until you **ship** them with E,
-which costs 1 move. A shipment scores like a poker hand
-([core/hands.gd](core/hands.gd)): every number scores `value × 10 × mult`,
-where the mult is the shipment's length plus a bonus per number for each
-pattern the whole shipment has.
-
-| Pattern | Example | Bonus per number |
-|---------|---------|------------------|
-| straight (3+ consecutive) | 4 5 6 | +2 |
-| match (2+ equal) | 7 7 | +2 |
-| all prime / Fibonacci / powers of 2 / squares (3+) | 2 3 5 | +2 each |
-| all even / all odd (3+) | 2 6 8 | +1 |
-
-So 4 5 6 shipped together score ×9, while 3 7 9 score only ×6 (odd), and
-shipping each number on its own scores ×1. Q (or a right-click) ships only part
-of the run, from the exit: from a ready 3 7 8 9, ship 7 8 9 as a straight and
-keep the 3. The tension: waiting builds a bigger, prettier hand, but the run
-takes up room in the column, newcomers keep arriving, an overflow costs a
-life, and the boss swaps the sorted pair nearest the exit. When the board
-empties, ship rooms also get a batch of three that needs sorting (a lone
-newcomer is always ready, so E alone used to score forever), but the batch
-borrows the next two arrivals, so emptying the board does not speed up the
-inflow. Ship rooms have their own arrival pace and targets (`ship_cfg` in
-`Run.ROOMS`).
-
-**Shipments are limited**, like hands in a round of Balatro: 5 to 7 per room,
-12 against the boss (`"ships"` in `ship_cfg`, shown next to the moves; the
-last one blinks red). Out of shipments below the target = the room is lost.
-Without the limit Insertion had no real decision: inserting the smallest
-number makes a whole group ready at once, so shipping everything at once was
-as good as waiting (a near-perfect player beat it by only ~26%, against ×2.5
-in Bubble). The Insertion elite of a ship room uses duplicates instead of
-reversed data, because there reversed data makes the whole column ready in
-one go.
-
-`-- --classic` brings back the old rules for comparison.
-
-### The floor
-
-A run is one floor with 4 rooms: a Bubble fight and an Insertion fight (in
-random order), an elite on reversed data (duplicates for the Insertion elite in ship rooms), and the boss **The Adversary**,
-which always adds the worst possible element. Before each room you pick 1 of 3
-items (max 5, order = order of activation; with every slot full you can only
-skip). Items that work in one algorithm only (Binary Search, Express Lane)
-are offered only while a room of that algorithm is still ahead. Lives carry over between rooms.
-Each room pays bits (+1 for every 5 unspent moves): 2 bits reroll the offer,
-5 heal a life, and skipping an item gives 3.
-
-- `core/run.gd`: floor plan (the `ROOMS` table), rewards, bits, lives.
-- `core/items/catalog.gd`: 11 items, including Sieve of Eratosthenes, Parity
-  Bit, Fibonacci Spiral, Power Tower, Chain Reactor, Fuse, Binary Search
-  (Insertion only), Express Lane (Bubble only).
-- `core/bots/bots.gd`: players for each algorithm (demo, sim, tests). They
-  always sort perfectly; in ship rooms GREEDY ships whatever is ready at once,
-  SMART grows runs and ships the best part of them when it has to (with a
-  shipment limit it waits for 5 numbers, or 3 with a pattern).
-- `ui/run_view.gd`: item choice with the floor map, end of run, transitions
-  between screens (fade) and entry animations.
-- `ui/anim.gd`: easings and animation helpers.
-- `ui/room_view.gd`: the room for both algorithms. In Insertion the sorted
-  part grows from the top (green bracket), you insert the golden key at the
-  chosen spot, and the cost (shifts) is shown next to it.
-
-### Boss: The Adversary
-
-- Before the fight: a red warning on the choice screen and a boss card with
-  its face and rules. The room has a red theme, and the goal is the **boss's
-  HP**, which drops with every point.
-- Its numbers are bigger than anything on the board (they have to travel the
-  whole column) and **cursed**: they score half (purple frame).
-- Every 4 moves it **strikes**, with a warning one move ahead: it swaps the
-  sorted pair closest to the exit (move it first to dodge) or, when nothing is
-  sorted, throws in an extra number.
-- At half HP it becomes **enraged** (phase 2): new numbers and strikes come
-  one move sooner.
-- **Phase shield**: until it is enraged, points stop at half its HP (a blue
-  mark on the HP bar; "SHIELD -X" shows what was lost). Hands multiply per
-  number, so with Sieve + Doubler one shipment used to one-shot it in about
-  half of the runs (two thirds with Express Lane too). Now it always takes at
-  least two hits, and the strongest builds kill it in 2–3 shipments.
-
-In a ship room with no items a smart shipper beats it in ~67% of runs and a
-greedy one in ~6%; with two items 72% and 25%.
-
-### Items
-
-11 items, each with a pixel icon (`ui/icons.gd`, drawn in code). When an item
-triggers, what it added pops up above its row (`+3` multiplier in red, `+20`
-points in blue, `×2`), and items with a different effect show it in words
-("+1 move", "free move"). **Express Lane** changes how you play: lifting the
-largest number carries it up to 3 cells higher for free.
-
-### Balance
-
-`sim/sim_rooms.gd` plays every room type from `Run.ROOMS` on many seeds (no
-target, until the move budget runs out) and shows how often each player would
-beat the target: the perfect bot in a classic room, and the greedy and smart
-shippers in a ship room. The boss still gets enraged at half of its real
-target. A ship room is well tuned when greedy usually misses and smart usually
-makes it: the gap is what the ship decision is worth.
-
-| Room (no items) | classic | ship: greedy | ship: smart |
-|-----------------|---------|--------------|-------------|
-| Bubble fight | 88% | 6% | 84% |
-| Insertion fight | 100% | 25% | 71% |
-| Bubble elite | 92% | 2% | 83% |
-| Insertion elite | 100% | 27% | 76% |
-| Boss | 52% | 6% | 67% |
-
-With two random items greedy reaches 11–50% and smart 76–91%.
-
-```bash
-godot --headless --path . -s res://sim/sim_rooms.gd
-godot --headless --path . -s res://sim/sim_rooms.gd -- --ship --seeds 100 --only fight_bubble
-```
-
-## Core (stage 1)
-
-The game logic is plain classes (`RefCounted`), with no scenes or window, so
-it can be tested and simulated.
-
-| File | What it does |
-|------|--------------|
-| `core/board.gd`, `core/element.gd` | array of elements with a capacity |
-| `core/events.gd`, `core/event_bus.gd` | event names and the event bus (order = slot order) |
-| `core/room.gd` | room: moves, budget, clearing, chains, shipping, score, win/loss, inflow |
-| `core/hands.gd` | what a shipment is worth: length + patterns → mult |
-| `core/score_context.gd`, `core/move_context.gd` | what items can change (points × multiplier, move cost) |
-| `core/algorithms/bubble.gd` | swapping neighbours, the largest surfaces at the top |
-| `core/algorithms/insertion.gd` | inserting the key, every shift costs 1, the smallest leaves first |
-| `core/data_gen.gd` | starting data: random, nearly sorted, reversed, duplicates |
-| `core/number_props.gd` | even, prime, powers of two, Fibonacci, squares |
-| `core/items/` | an item as data + reactions to events |
-
-The rule shared by all algorithms: an element at the exit disappears and
-scores when it is the extreme one (largest in Bubble, smallest in Insertion).
-In classic rooms it leaves by itself, and several clears after one move make a
-chain: clear score = `value × 10 × multiplier`, where the multiplier starts at
-the link's number in the chain (max 8). In ship rooms it waits for a SHIP move
-and the multiplier is the hand's. Either way items add to the points or the
-multiplier of each number.
-
-## Tests
+## Tests and balance
 
 ```bash
 godot --headless --path . --import
 godot --headless --path . -s res://tests/run_tests.gd
+godot --headless --path . -s res://sim/sim_rooms.gd -- --ship
 ```
 
-The first command is needed only once and after adding a new class
-(`class_name`). Exit code 0 = everything passed. A test fails on a failed
-check or on any engine error while it runs.
+Run `--import` once, and again after adding a `class_name` or changing the
+strings. The tests exit with 0 when everything passes; any engine error also
+fails a test. The simulator plays every room with two bots, one that ships at
+once and one that waits for better hands. A room is tuned when the first
+usually misses the target and the second usually makes it.
+
+## Text and translations
+
+New text is a new row in [i18n/strings.csv](i18n/strings.csv) and `tr("KEY")`
+in the code. `tests/test_i18n.gd` checks that every key has both languages and
+that the font can draw every character. The font, Jersey 10, is used only at
+16, 20 and 32 px, where it stays crisp.
 
 ## Assets
 
-Every external asset has an entry in [CREDITS.md](CREDITS.md).
+Every external asset is listed in [CREDITS.md](CREDITS.md) with its source and
+licence.

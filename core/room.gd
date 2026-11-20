@@ -7,7 +7,7 @@ extends RefCounted
 enum State { PLAYING, WON, LOST }
 
 const BASE_POINTS := 10
-## The chain part of the multiplier stops growing here (as in Bubble Sort Quest).
+## The chain part of the multiplier stops growing here.
 const CHAIN_CAP := 8
 
 var board: Board

@@ -20,7 +20,7 @@ func move_cost(_board: Board, _move: Dictionary) -> int:
 	return 1
 
 
-## True when the move goes against the algorithm (the "wrong swap" of BSQ).
+## True when the move goes against the algorithm (a "wrong swap").
 ## It is still allowed; items and difficulty decide what it costs.
 func is_wrong(_board: Board, _move: Dictionary) -> bool:
 	return false
