@@ -116,12 +116,12 @@ static func fuse() -> Item:
 ## In Insertion rooms an insert never costs more than 2.
 static func binary_search() -> Item:
 	return Item.new(&"binary_search", [Events.BEFORE_MOVE, Events.INSERT]) \
+		.only_for(Algorithms.INSERTION) \
 		.react(Events.BEFORE_MOVE, func(data: Dictionary) -> void:
 			var ctx: MoveContext = data["ctx"]
 			if ctx.move.get("type") == Events.INSERT and ctx.cost > 2:
 				ctx.cost = 2
-				ctx.notes.append(&"binary_search")
-				_ping(data, &"binary_search", "FX_CHEAPER"))
+				ctx.note(&"binary_search", "FX_CHEAPER"))
 
 
 ## The first move of each room is free.
@@ -134,23 +134,30 @@ static func warm_cache() -> Item:
 		if not used[0]:
 			var ctx: MoveContext = data["ctx"]
 			ctx.cost = 0
-			ctx.notes.append(&"warm_cache")
-			used[0] = true
-			_ping(data, &"warm_cache", "FX_FREE"))
+			ctx.note(&"warm_cache", "FX_FREE")
+			used[0] = true)
 	return item
 
 
-## Bubble only: a correct swap that lifts the biggest number keeps carrying it
-## up for free, up to 3 more places. (Unlimited made the boss trivial.)
+## Bubble only: a correct swap that lifts the biggest number not yet in place
+## keeps carrying it up for free, up to 3 more places. (Unlimited made the
+## boss trivial.)
 static func express_lane() -> Item:
-	return Item.new(&"express_lane", [Events.SWAP]) 		.react(Events.SWAP, func(data: Dictionary) -> void:
+	return Item.new(&"express_lane", [Events.SWAP]) \
+		.only_for(Algorithms.BUBBLE) \
+		.react(Events.SWAP, func(data: Dictionary) -> void:
 			if data["wrong"]:
 				return
 			var room: Room = data["room"]
 			var board := room.board
 			var j: int = int(data["move"]["index"]) + 1
-			if board.value_at(j) != board.max_value():
+			# Above `free` the numbers are already in place (a ship room keeps them).
+			var free := board.size() - room.ready_count()
+			if j >= free:
 				return
+			for i in free:
+				if board.value_at(i) > board.value_at(j):
+					return
 			var carried := 0
 			while carried < 3 and j < board.size() - 1 and board.value_at(j) > board.value_at(j + 1):
 				board.swap(j, j + 1)

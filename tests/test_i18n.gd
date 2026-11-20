@@ -18,6 +18,14 @@ func _rows() -> Dictionary:
 	return rows
 
 
+## The screens are not covered by other tests; at least make sure they parse.
+func test_ui_scripts_compile() -> void:
+	for f in DirAccess.get_files_at("res://ui"):
+		if f.ends_with(".gd"):
+			var script := load("res://ui/" + f) as GDScript
+			check(script != null and script.can_instantiate(), "ui/%s compiles" % f)
+
+
 func test_header_is_keys_en_pl() -> void:
 	var f := FileAccess.open(CSV, FileAccess.READ)
 	check_eq(f.get_csv_line(), PackedStringArray(["keys", "en", "pl"]), "header")
@@ -47,9 +55,16 @@ func test_keys_used_in_code_exist() -> void:
 
 func test_every_item_has_texts() -> void:
 	var rows := _rows()
-	for item in [ItemCatalog.sieve(), ItemCatalog.bubble_pump(), ItemCatalog.doubler(), ItemCatalog.warm_cache()]:
+	for id in ItemCatalog.IDS:
+		var item := ItemCatalog.make(id)
 		check(rows.has(item.name_key), "missing %s" % item.name_key)
 		check(rows.has(item.desc_key), "missing %s" % item.desc_key)
+
+
+func test_every_hand_pattern_has_a_name() -> void:
+	var rows := _rows()
+	for p: StringName in Hands.BONUS_PER_ELEMENT:
+		check(rows.has("HAND_" + String(p).to_upper()), "missing name for hand %s" % p)
 
 
 func test_translations_load_in_both_languages() -> void:

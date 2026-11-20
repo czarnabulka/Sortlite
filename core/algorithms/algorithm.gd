@@ -40,6 +40,18 @@ func can_surface(_board: Board) -> bool:
 	return false
 
 
+## How many elements would leave one after another from the exit right now:
+## the run that is already in its final place.
+func ready_count(board: Board) -> int:
+	var copy := Board.new(board.capacity)
+	copy.cells = board.cells.duplicate()
+	var n := 0
+	while not copy.is_empty() and can_surface(copy):
+		copy.remove_at(surface_index(copy))
+		n += 1
+	return n
+
+
 ## Where a newcomer enters.
 func arrive_index(board: Board) -> int:
 	return board.size()

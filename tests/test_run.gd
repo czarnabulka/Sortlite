@@ -7,7 +7,7 @@ func _play_room(run: Run) -> void:
 	var guard := 0
 	while s.is_playing() and guard < 2000:
 		guard += 1
-		var move := Bots.choose_for(s.room)
+		var move := Bots.choose_in(s)
 		if move.is_empty():
 			s.deliver()
 		elif not s.play(move):
@@ -99,3 +99,24 @@ func test_items_leave_the_old_bus() -> void:
 	var after := old_bus.handler_count(Events.SURFACE) + old_bus.handler_count(Events.BEFORE_MOVE) \
 			+ old_bus.handler_count(Events.CHAIN) + old_bus.handler_count(Events.OVERFLOW)
 	check_eq(after, 0, "detached when the room closed")
+
+
+func test_offer_skips_items_for_algorithms_no_longer_ahead() -> void:
+	for s in 30:
+		var run := Run.new(s)
+		run.cleared = run.plan.size() - 1  # only the boss (Bubble) is left
+		run._make_offer()
+		for item in run.offer:
+			check(item.algorithm == &"" or item.algorithm == Algorithms.BUBBLE,
+					"seed %d: %s is useless in a Bubble room" % [s, item.id])
+
+
+func test_full_slots_refuse_a_pick_but_allow_a_skip() -> void:
+	var run := Run.new(7)
+	for id in ItemCatalog.IDS.slice(0, Run.MAX_SLOTS):
+		run.items.append(ItemCatalog.make(id))
+	check(run.slots_full(), "full")
+	check(not run.take(0), "no room for another item")
+	check_eq(run.phase, Run.Phase.REWARD, "still choosing")
+	check(run.skip(), "skip still works")
+	check_eq(run.phase, Run.Phase.ROOM, "room started")

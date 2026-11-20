@@ -9,6 +9,9 @@ var name_key: String
 var desc_key: String
 var tags: Array[StringName] = []
 var rarity := 1
+## The only algorithm this item works in (Algorithms.*), or &"" for any.
+## Offers skip it when no room left on the floor uses that algorithm.
+var algorithm: StringName = &""
 
 var _handlers: Dictionary = {}  # StringName -> Callable
 var _bus: EventBus
@@ -20,6 +23,11 @@ func _init(p_id: StringName, p_tags: Array[StringName] = []) -> void:
 	name_key = key + "_NAME"
 	desc_key = key + "_DESC"
 	tags = p_tags
+
+
+func only_for(p_algorithm: StringName) -> Item:
+	algorithm = p_algorithm
+	return self
 
 
 func react(event: StringName, handler: Callable) -> Item:

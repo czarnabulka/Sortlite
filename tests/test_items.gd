@@ -152,3 +152,26 @@ func test_score_effects_are_recorded_in_order() -> void:
 func test_every_item_has_an_icon() -> void:
 	for id in ItemCatalog.IDS:
 		check(Icons.ITEMS.has(id), "icon for %s" % id)
+
+
+func test_cost_item_shows_nothing_on_a_refused_move() -> void:
+	var item := ItemCatalog.binary_search()
+	var bus := EventBus.new()
+	bus.record_history = true
+	item.attach(bus)
+	var room := insertion_room([4, 6, 7, 9, 2], 1_000_000, 1, -1, bus)
+	room.start()
+	check(not room.play({"type": Events.INSERT, "to": 0}), "capped to 2, still over a budget of 1")
+	check(not bus.events_seen().has(Events.ITEM_TRIGGERED), "no ping for a refused move")
+	check(room.play({"type": Events.INSERT, "to": 3}), "the nearest place costs 1")
+
+
+func test_cost_item_pings_when_the_move_is_made() -> void:
+	var item := ItemCatalog.binary_search()
+	var bus := EventBus.new()
+	bus.record_history = true
+	item.attach(bus)
+	var room := insertion_room([4, 6, 7, 9, 2], 1_000_000, 100, -1, bus)
+	room.start()
+	room.play({"type": Events.INSERT, "to": 0})
+	check(bus.events_seen().has(Events.ITEM_TRIGGERED), "ping after the move")

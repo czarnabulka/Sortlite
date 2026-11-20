@@ -10,6 +10,8 @@ extends Node2D
 ##   key (first unsorted element) is inserted into it, the smallest leaves.
 
 signal continue_pressed
+## The player switched arrivals between moves and time (M); the run keeps it.
+signal mode_changed(new_mode: RoomSession.ArrivalMode)
 
 const TANK_CX := 300.0
 const TANK_TOP := 46.0
@@ -93,6 +95,9 @@ var intro_t := 0.0
 var end_t := 0.0
 
 var selected := 0
+## Ship rooms: how many ready numbers E ships (-1 = all of them; Q lowers it).
+var ship_n := -1
+var banner_sub := ""
 var hover := -1
 var focus_item: StringName = &""
 var vis: Dictionary = {}  # uid -> Vis
@@ -151,6 +156,7 @@ func set_session(p_session: RoomSession, p_room_no: int, p_room_total: int, p_ki
 	last_mult = 0
 	banner_t = 9.0
 	pop_line = 0
+	ship_n = -1
 	var bus := session.bus
 	# Added after the items, so the screen sees the final points and mult.
 	bus.on(Events.SWAP, _on_swap)
@@ -158,6 +164,7 @@ func set_session(p_session: RoomSession, p_room_no: int, p_room_total: int, p_ki
 	bus.on(Events.WRONG_MOVE, _on_wrong)
 	bus.on(Events.SURFACE, _on_surface)
 	bus.on(Events.CHAIN, _on_chain)
+	bus.on(Events.HAND, _on_hand)
 	bus.on(Events.OVERFLOW, _on_overflow)
 	bus.on(Events.ITEM_TRIGGERED, _on_item_triggered)
 	bus.on(Events.BOSS_AIM, _on_boss_aim)
@@ -180,6 +187,47 @@ func set_session(p_session: RoomSession, p_room_no: int, p_room_total: int, p_ki
 
 func is_bubble() -> bool:
 	return session.room.algorithm.id == Algorithms.BUBBLE
+
+
+func is_ship() -> bool:
+	return session.room.manual_ship
+
+
+## How many numbers E would ship now (0 when nothing is ready).
+func ship_count() -> int:
+	var ready := session.room.ready_count()
+	if ready == 0:
+		return 0
+	return ready if ship_n < 0 else clampi(ship_n, 1, ready)
+
+
+func _ship() -> void:
+	var n := ship_count()
+	if n > 0 and session.play({"type": Events.SHIP, "count": n}):
+		ship_n = -1
+
+
+## Q: ship one fewer, wrapping back to all of them.
+func _ship_fewer() -> void:
+	var n := ship_count()
+	if n == 0:
+		return
+	ship_n = n - 1 if n > 1 else -1
+
+
+## Board index of the number under `p`, or -1.
+func _cell_at(p: Vector2) -> int:
+	if absf(p.x - TANK_CX) > TANK_W * 0.5:
+		return -1
+	for i in session.room.board.size():
+		if absf(_slot_pos(i).y - p.y) <= SLOT_H * 0.5:
+			return i
+	return -1
+
+
+## How far from the exit cell `i` is, counting the exit cell as 1.
+func _exit_distance(i: int) -> int:
+	return session.room.board.size() - i if is_bubble() else i + 1
 
 
 func is_boss() -> bool:
@@ -228,6 +276,12 @@ func handle_input(event: InputEvent, local: Vector2) -> void:
 				if not key.echo:
 					session.deliver()
 					_reset_selection()
+			KEY_E:
+				if not key.echo and is_ship():
+					_ship()
+			KEY_Q:
+				if not key.echo and is_ship():
+					_ship_fewer()
 			KEY_D:
 				if not key.echo:
 					demo = not demo
@@ -243,6 +297,7 @@ func handle_input(event: InputEvent, local: Vector2) -> void:
 				if not key.echo:
 					mode = RoomSession.ArrivalMode.TIME if mode == RoomSession.ArrivalMode.TURNS else RoomSession.ArrivalMode.TURNS
 					session.set_mode(mode)
+					mode_changed.emit(mode)
 	elif event is InputEventMouseMotion:
 		hover = _target_at(local)
 		var row := _item_row_at(local)
@@ -255,6 +310,16 @@ func handle_input(event: InputEvent, local: Vector2) -> void:
 				_step_selection(1)
 			MOUSE_BUTTON_WHEEL_DOWN:
 				_step_selection(-1)
+			MOUSE_BUTTON_RIGHT:
+				# Right-click a ready number: ship up to it (click again to ship).
+				var c := _cell_at(local)
+				if is_ship() and not is_over() and c >= 0:
+					var d := _exit_distance(c)
+					if d <= session.room.ready_count():
+						if d == ship_count():
+							_ship()
+						else:
+							ship_n = d
 			MOUSE_BUTTON_LEFT:
 				if is_over():
 					continue_pressed.emit()
@@ -378,11 +443,31 @@ func _on_surface(data: Dictionary) -> void:
 
 
 func _on_chain(data: Dictionary) -> void:
+	if is_ship():
+		return  # the hand banner says more
 	var length: int = data["length"]
 	banner_text = tr("CHAIN_BANNER") % length
+	banner_sub = ""
 	banner_color = Palette.GOLD
 	banner_delay = SWAP_DUR + (length - 1) * CHAIN_STEP + RISE_DUR
 	banner_t = -1.0
+
+
+## A shipment: "×mult" big, and the patterns it made under it.
+func _on_hand(data: Dictionary) -> void:
+	var count: int = data["count"]
+	banner_text = "×%d" % int(data["mult"])
+	banner_sub = hand_names(data["patterns"])
+	banner_color = Palette.GOLD if not (data["patterns"] as Array).is_empty() else Palette.TEXT
+	banner_delay = SWAP_DUR + (count - 1) * CHAIN_STEP + RISE_DUR
+	banner_t = -1.0
+
+
+func hand_names(patterns: Array) -> String:
+	var names: Array[String] = []
+	for p in patterns:
+		names.append(tr("HAND_" + String(p).to_upper()))
+	return " + ".join(names)
 
 
 func _on_overflow(data: Dictionary) -> void:
@@ -429,6 +514,7 @@ func _on_boss_strike(data: Dictionary) -> void:
 
 func _on_boss_enraged(_data: Dictionary) -> void:
 	banner_text = tr("BOSS_ENRAGED")
+	banner_sub = ""
 	banner_color = Palette.BAD
 	banner_delay = 0.0
 	banner_t = -1.0
@@ -482,10 +568,13 @@ func _process(delta: float) -> void:
 		demo_timer += delta
 		if demo_timer >= DEMO_STEP:
 			demo_timer = 0.0
-			var move := Bots.choose_for(session.room)
+			var move := Bots.choose_in(session)
 			if move.is_empty():
 				session.deliver()
 				_reset_selection()
+			elif move.get("type") == Events.SHIP:
+				ship_n = int(move["count"])
+				_ship()
 			else:
 				selected = move.get("index", move.get("to", 0))
 				_act(selected)
@@ -701,12 +790,15 @@ func _draw_left_panel() -> void:
 			draw_rect(r, Palette.PANEL_EDGE, false, 1.0)
 	_text("%s %d" % [tr("BITS"), bits], Vector2(x + 8, 184), S, Palette.GOLD, right, w - 16)
 
-	# Stats
-	_panel(Rect2(x, 200, w, 50))
-	_text(tr("BEST_CHAIN"), Vector2(x + 8, 220), S, Palette.MUTED)
-	_text("×%d" % room.best_chain, Vector2(x + 8, 220), M, Palette.GOLD, right, w - 16)
-	_text(tr("WRONG_MOVES"), Vector2(x + 8, 241), S, Palette.MUTED)
-	_text(str(room.wrong_moves), Vector2(x + 8, 241), M, Palette.BAD if room.wrong_moves > 0 else Palette.TEXT, right, w - 16)
+	if is_ship():
+		_draw_ship_box(Rect2(x, 200, w, 50))
+	else:
+		# Stats
+		_panel(Rect2(x, 200, w, 50))
+		_text(tr("BEST_CHAIN"), Vector2(x + 8, 220), S, Palette.MUTED)
+		_text("×%d" % room.best_chain, Vector2(x + 8, 220), M, Palette.GOLD, right, w - 16)
+		_text(tr("WRONG_MOVES"), Vector2(x + 8, 241), S, Palette.MUTED)
+		_text(str(room.wrong_moves), Vector2(x + 8, 241), M, Palette.BAD if room.wrong_moves > 0 else Palette.TEXT, right, w - 16)
 
 	# Arrivals
 	_panel(Rect2(x, 256, w, 46))
@@ -725,8 +817,32 @@ func _draw_left_panel() -> void:
 		_panel(Rect2(x, 308, w, 40), Palette.BAD if aiming else Palette.BAD.darkened(0.4))
 		draw_multiline_string(font, Vector2(x + 8, 324), warn, HORIZONTAL_ALIGNMENT_LEFT, w - 16, S, 2, Color(Palette.BAD.lightened(0.3), a))
 	else:
-		var hint := "HINT_" + String(room.algorithm.id).to_upper()
+		var hint := ("HINT_SHIP_" if is_ship() else "HINT_") + String(room.algorithm.id).to_upper()
 		draw_multiline_string(font, Vector2(x, 320), tr(hint), HORIZONTAL_ALIGNMENT_LEFT, w, S, 2, Palette.SOFT)
+
+
+## What E would ship now: how many, the hand's mult and its patterns.
+func _draw_ship_box(box: Rect2) -> void:
+	var n := ship_count() if session.is_playing() else 0
+	var right := HORIZONTAL_ALIGNMENT_RIGHT
+	var x := box.position.x
+	var w := box.size.x
+	if n == 0:
+		_panel(box)
+		_text(tr("SHIP_NOTHING"), Vector2(x + 8, box.position.y + 20), S, Palette.MUTED)
+		_text(tr("SHIP_KEYS"), Vector2(x + 8, box.position.y + 41), S, Palette.MUTED)
+		return
+	var values: Array[int] = []
+	for e in session.room.ship_preview(n):
+		values.append(e.value)
+	var hand := Hands.evaluate(values)
+	var patterns: Array = hand["patterns"]
+	var pulse := 0.5 + 0.5 * sin(time * 5.0)
+	_panel(box, Palette.GOLD.lerp(Palette.PANEL_EDGE, 0.5 * pulse) if not patterns.is_empty() else Palette.GOOD.darkened(0.3))
+	_text(tr("SHIP_N") % n, Vector2(x + 8, box.position.y + 20), S, Palette.TEXT)
+	_text("×%d" % int(hand["mult"]), Vector2(x + 8, box.position.y + 21), M, Palette.GOLD, right, w - 16)
+	var sub := hand_names(patterns) if not patterns.is_empty() else tr("SHIP_KEYS")
+	_text(sub, Vector2(x + 8, box.position.y + 41), S, Palette.GOLD if not patterns.is_empty() else Palette.MUTED)
 
 
 func _draw_tank() -> void:
@@ -765,6 +881,8 @@ func _draw_tank() -> void:
 			_marker(Vector2(pr.position.x, pr.get_center().y))
 	else:
 		_draw_insertion_guides(r, playing)
+	if is_ship() and playing:
+		_draw_ship_bracket(r)
 	if playing and session.is_aiming_pair():
 		_draw_aim(r)
 
@@ -784,6 +902,34 @@ func _draw_tank() -> void:
 	_rounded(chip, Palette.value_color(session.next_value, session.vmax), 3)
 	_text(str(session.next_value), Vector2(chip.position.x, chip.position.y + 19), M, Palette.INK, HORIZONTAL_ALIGNMENT_CENTER, chip.size.x)
 	_bar(Rect2(nb.position.x, nb.end.y + 2, nb.size.x, 3), session.arrival_progress(), Palette.GOLD)
+
+
+## Ship rooms: a green bracket along the ready run at the exit, gold over
+## the part E would ship.
+func _draw_ship_bracket(r: Rect2) -> void:
+	var ready := session.room.ready_count()
+	if ready == 0:
+		return
+	var bx := r.position.x - 11
+	var whole := _run_span(ready)
+	draw_line(Vector2(bx, whole.x), Vector2(bx, whole.y), Palette.GOOD, 2.0)
+	var part := _run_span(ship_count())
+	var a := 0.7 + 0.3 * sin(time * 5.0)
+	var c := Color(Palette.GOLD, a)
+	draw_line(Vector2(bx - 1, part.x), Vector2(bx - 1, part.y), c, 3.0)
+	draw_line(Vector2(bx - 1, part.x), Vector2(bx + 4, part.x), c, 2.0)
+	draw_line(Vector2(bx - 1, part.y), Vector2(bx + 4, part.y), c, 2.0)
+
+
+## Top and bottom y of the `count` cells nearest the exit. Bubble stacks from
+## the bottom, so its run is the top of the stack, not the top of the tank.
+func _run_span(count: int) -> Vector2:
+	var size := session.room.board.size()
+	var near := size - 1 if is_bubble() else 0
+	var far := size - count if is_bubble() else count - 1
+	var y1 := minf(_slot_pos(near).y, _slot_pos(far).y) - SLOT_H * 0.5 + 3.0
+	var y2 := maxf(_slot_pos(near).y, _slot_pos(far).y) + SLOT_H * 0.5 - 3.0
+	return Vector2(y1, y2)
 
 
 ## The sorted part (green bracket), the key, and where it would go.
@@ -848,6 +994,8 @@ func _draw_elements() -> void:
 	# The element that leaves next: the biggest in Bubble, the smallest in Insertion.
 	var leaver := board.max_value() if is_bubble() else board.min_value()
 	var key_index := -1 if is_bubble() else board.sorted_prefix_length()
+	var ready_now := session.room.ready_count() if is_ship() else 0
+	var ship_n_now := ship_count() if is_ship() and session.is_playing() else 0
 	for i in board.size():
 		var e := board.cells[i]
 		var v: Vis = vis.get(e.uid)
@@ -861,6 +1009,12 @@ func _draw_elements() -> void:
 		_rounded(r, c, 4)
 		if i == key_index and session.is_playing():
 			draw_rect(r.grow(2), Palette.GOLD, false, 2.0)
+		elif is_ship():
+			var d := _exit_distance(i)
+			if d <= ship_n_now:
+				draw_rect(r.grow(2), Color(Palette.GOLD, 0.6 + 0.3 * sin(time * 5.0)), false, 1.0)
+			elif d <= ready_now:
+				draw_rect(r.grow(2), Color(Palette.GOOD, 0.7), false, 1.0)
 		elif e.value == leaver:
 			draw_rect(r.grow(2), Color(Palette.GOLD, 0.5 + 0.3 * sin(time * 5.0)), false, 1.0)
 		_text(str(e.value), Vector2(r.position.x, r.position.y + 20), M, Color(Palette.INK, v.alpha), HORIZONTAL_ALIGNMENT_CENTER, EL_W)
@@ -948,6 +1102,9 @@ func _draw_banner() -> void:
 	var y := TANK_TOP + 76.0 - 10.0 * p
 	_text(banner_text, Vector2(TANK_CX - 120 + 2, y + 2), L, Color(Palette.INK, a), HORIZONTAL_ALIGNMENT_CENTER, 240)
 	_text(banner_text, Vector2(TANK_CX - 120, y), L, Color(banner_color, a), HORIZONTAL_ALIGNMENT_CENTER, 240)
+	if banner_sub != "":
+		_text(banner_sub, Vector2(TANK_CX - 150 + 1, y + 23), M, Color(Palette.INK, a), HORIZONTAL_ALIGNMENT_CENTER, 300)
+		_text(banner_sub, Vector2(TANK_CX - 150, y + 22), M, Color(banner_color, a), HORIZONTAL_ALIGNMENT_CENTER, 300)
 
 
 func _draw_end_overlay() -> void:
@@ -985,6 +1142,8 @@ func _draw_help() -> void:
 		"HELP_SELECT", "HELP_SWAP", "HELP_LET_IN", "HELP_RULES", "HELP_DEMO",
 		"HELP_MODE", "HELP_CRT", "HELP_LANG", "HELP_TOGGLE",
 	]
+	if is_ship():
+		lines.insert(2, "HELP_SHIP")
 	var r := Rect2(110, 26, 420, 52 + lines.size() * 26)
 	draw_set_transform_matrix(Anim.around(r.get_center(), Anim.pop_scale(overlay_t)))
 	_panel(r, Palette.GOLD)
@@ -1020,8 +1179,13 @@ func _draw_rules() -> void:
 	var w := r.end.x - 16 - x
 	var y := r.position.y + 64
 	var keys: Array[String] = []
-	for i in range(1, 5):
+	# Ship rooms drop the lines about numbers leaving by themselves.
+	var numbers := ([1, 3] if is_bubble() else [1, 2, 3]) if is_ship() else [1, 2, 3, 4]
+	for i in numbers:
 		keys.append("RULES_%s_%d" % [algo, i])
+	if is_ship():
+		keys.append("RULES_SHIP_1")
+		keys.append("RULES_SHIP_2")
 	if session.feed == RoomSession.FEED_ADVERSARY:
 		keys.append("RULES_ADVERSARY")
 	for i in keys.size():

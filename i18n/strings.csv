@@ -70,6 +70,7 @@ CONTINUE,SPACE: continue,SPACJA: dalej
 NO_ITEMS,none yet,jeszcze brak
 YOUR_ITEMS,YOUR ITEMS,TWOJE PRZEDMIOTY
 CHOOSE_ITEM,CHOOSE AN ITEM FOR THE NEXT ROOM,WYBIERZ PRZEDMIOT NA NASTĘPNY POKÓJ
+SLOTS_FULL,ALL ITEM SLOTS ARE FULL: S SKIPS FOR BITS,WSZYSTKIE MIEJSCA ZAJĘTE: S POMIJA ZA BITY
 REWARD_KEYS,A D / click: pick   SPACE: take   S: skip (+%d bits)   R: reroll (%d)   E: heal (%d),A D / klik: wybór   SPACJA: bierz   S: pomiń (+%d bitów)   R: losuj (%d)   E: lecz (%d)
 FLOOR_CLEARED,FLOOR CLEARED,PIĘTRO ZALICZONE
 RUN_OVER,RUN OVER,KONIEC RUNU
@@ -112,3 +113,19 @@ BOSS_ENRAGED,ENRAGED!,WŚCIEKŁOŚĆ!
 BOSS_PHASE_2,· PHASE 2,· FAZA 2
 BOSS_AIMING_THROW,After your next move it throws in an extra number!,Po twoim ruchu wrzuci dodatkową liczbę!
 BOSS_THROW,THROWN IN!,WRZUTKA!
+HAND_STRAIGHT,STRAIGHT,STRIT
+HAND_SAME,MATCH,KOMPLET
+HAND_EVEN,ALL EVEN,PARZYSTE
+HAND_ODD,ALL ODD,NIEPARZYSTE
+HAND_PRIME,PRIMES,PIERWSZE
+HAND_FIBONACCI,FIBONACCI,FIBONACCI
+HAND_POW2,POWERS OF 2,POTĘGI 2
+HAND_SQUARE,SQUARES,KWADRATY
+SHIP_N,E: SHIP %d,E: WYŚLIJ %d
+SHIP_NOTHING,NOTHING READY TO SHIP,NIC GOTOWEGO DO WYSYŁKI
+SHIP_KEYS,Q: fewer   right-click: up to,Q: mniej   PPM: do tej
+HINT_SHIP_BUBBLE,Swap neighbours. Sorted numbers wait at the exit: E ships them.,Zamieniaj sąsiadów. Posortowane czekają przy wyjściu: E je wysyła.
+HINT_SHIP_INSERTION,Put the gold key into the sorted top. E ships the ready ones.,Wstaw złoty klucz wyżej. E wysyła gotowe.
+HELP_SHIP,E / Q / right-click|ship the ready run / fewer / up to here,E / Q / PPM|wyślij gotowe / mniej / do tej
+RULES_SHIP_1,Numbers that are sorted at the exit glow green. They wait there until you ship them with E (1 move).,"Liczby posortowane przy wyjściu świecą na zielono. Czekają, aż wyślesz je klawiszem E (1 ruch)."
+RULES_SHIP_2,"A shipment scores × its length, more for patterns: straight 4 5 6, a match 7 7, all even, all prime... Wait for a better run, but don't let the column overflow.","Wysyłka daje × swoją długość, więcej za wzory: strit 4 5 6, komplet 7 7, same parzyste, same pierwsze... Czekaj na lepszy układ, ale nie przepełnij kolumny."

@@ -40,6 +40,7 @@ var card_lift: Array[float] = [0.0, 0.0, 0.0]
 var picking := -1
 var pick_t := 0.0
 var seen_rules: Dictionary = {}  # algorithm id -> true, per run
+var full_flash := 0.0
 
 var _fade_state := 0  # 0 none, 1 going dark, 2 coming back
 var _fade_t := 0.0
@@ -53,6 +54,9 @@ func _ready() -> void:
 	room_view.demo = demo
 	room_view.help_open = OS.get_cmdline_user_args().has("--controls")
 	room_view.continue_pressed.connect(func() -> void: _fade_to(_on_room_continue))
+	room_view.mode_changed.connect(func(m: RoomSession.ArrivalMode) -> void:
+		run.mode = m
+		Settings.save_arrival_mode(m))
 	add_child(room_view)
 	fader = Fader.new()
 	fader.z_index = 100
@@ -69,7 +73,7 @@ func _ready() -> void:
 
 
 func new_run(seed_value: int) -> void:
-	run = Run.new(seed_value)
+	run = Run.new(seed_value, Settings.load_arrival_mode(), not OS.get_cmdline_user_args().has("--classic"))
 	seen_rules.clear()
 	selected_card = 0
 	_show_phase()
@@ -151,6 +155,9 @@ func handle_input(event: InputEvent, local: Vector2) -> void:
 func _pick(i: int) -> void:
 	if i < 0 or i >= run.offer.size():
 		return
+	if run.slots_full():
+		full_flash = 1.0  # the "slots full" line flashes; S skips instead
+		return
 	selected_card = i
 	picking = i
 	pick_t = 0.0
@@ -198,6 +205,7 @@ func _process(delta: float) -> void:
 				run.take(i)
 				_show_phase())
 
+	full_flash = maxf(full_flash - delta * 2.0, 0.0)
 	for i in card_lift.size():
 		var target := 6.0 if i == selected_card and run.phase == Run.Phase.REWARD else 0.0
 		card_lift[i] = lerpf(card_lift[i], target, 1.0 - exp(-14.0 * delta))
@@ -207,7 +215,12 @@ func _process(delta: float) -> void:
 		if demo_timer >= DEMO_PICK_SEC:
 			demo_timer = 0.0
 			if run.phase == Run.Phase.REWARD:
-				_pick(0)
+				if run.slots_full():
+					_fade_to(func() -> void:
+						run.skip()
+						_show_phase())
+				else:
+					_pick(0)
 			elif run.phase == Run.Phase.ROOM and room_view.is_over() and room_view.end_t > 1.0:
 				_fade_to(_on_room_continue)
 	if run.phase != Run.Phase.ROOM:
@@ -267,7 +280,10 @@ func _draw_map(y: float) -> void:
 
 func _draw_reward() -> void:
 	var title_a := Anim.ease_out_cubic((screen_t - 0.15) / 0.3)
-	if run.current_room()["kind"] == Run.BOSS:
+	if run.slots_full():
+		var c := Palette.BAD.lightened(0.15 + 0.4 * full_flash)
+		_text(tr("SLOTS_FULL"), Vector2(0, 108), M, _a(c, title_a), HORIZONTAL_ALIGNMENT_CENTER, 640)
+	elif run.current_room()["kind"] == Run.BOSS:
 		# The last pick before the boss says so, in red.
 		var pulse := 0.75 + 0.25 * sin(time * 4.0)
 		_text(tr("NEXT_BOSS"), Vector2(0, 108), M, _a(Palette.BAD.lightened(0.15), title_a * pulse), HORIZONTAL_ALIGNMENT_CENTER, 640)

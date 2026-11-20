@@ -12,6 +12,10 @@ const MOVE := &"move"
 ## Algorithm-specific move kinds, emitted together with MOVE.
 const SWAP := &"swap"
 const INSERT := &"insert"
+## Ship rooms: the player sends the ready run out. Move: {"type": SHIP, "count": n}.
+const SHIP := &"ship"
+## A shipment is about to score. data: room, count, values, mult, patterns.
+const HAND := &"hand"
 const WRONG_MOVE := &"wrong_move"
 ## An element is about to score. data.ctx is a ScoreContext; handlers change points / mult.
 const SURFACE := &"surface"

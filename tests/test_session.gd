@@ -229,3 +229,20 @@ func test_cursed_numbers_score_half() -> void:
 	room.play({"type": Events.SWAP, "index": 1})
 	# 3 cursed: 15×1, then 20×2, 10×3
 	check_eq(room.score, 15 + 40 + 30, "half points for the cursed 3")
+
+
+func test_boss_enrages_at_half_the_target_by_default() -> void:
+	var s := RoomSession.new(1, RoomSession.ArrivalMode.TURNS, [], {
+		"boss": RoomSession.BOSS_ADVERSARY, "target": 2401})
+	check_eq(s.enrage_at, 1201, "half, rounded up")
+
+
+func test_boss_enrage_score_can_be_set_apart_from_the_target() -> void:
+	# sim/ plays with no target but must still see phase 2.
+	var t := RoomSession.new(1, RoomSession.ArrivalMode.TURNS, [], {
+		"boss": RoomSession.BOSS_ADVERSARY, "target": 1_000_000_000, "enrage_at": 0})
+	check(not t.enraged, "calm before any move")
+	t.room.board.insert_at(0, t.room.board.make(5))
+	t.room.board.insert_at(0, t.room.board.make(7))
+	t.play({"type": Events.SWAP, "index": 0})
+	check(t.enraged, "enraged at the given score")

@@ -8,7 +8,7 @@ extends RefCounted
 
 enum ArrivalMode { TIME, TURNS }
 
-## When at most one element is left, the next arrival is a batch of three,
+## Classic rooms: when at most one element is left, the next arrival is a batch of three,
 ## ordered by the algorithm so the newcomers still have to be sorted
 ## (a lone newcomer would always surface for free). From Bubble Sort Quest.
 const BATCH_SIZE := 3
@@ -41,6 +41,10 @@ const DEFAULTS := {
 	"every_moves": 3,
 	"boss": BOSS_NONE,
 	"strike_every": 5,
+	## Score at which the boss is enraged; -1 = half of the target.
+	"enrage_at": -1,
+	## Ship room: ready numbers wait at the exit for a SHIP move (Room.manual_ship).
+	"ship": false,
 }
 
 var room: Room
@@ -67,6 +71,7 @@ var strike_uids: Array[int] = []
 ## Second phase: at half of the target the boss gets angry. Newcomers come one
 ## move sooner and strikes come one move sooner.
 var enraged := false
+var enrage_at: int
 
 var timer := 0.0
 var moves_since_arrival := 0
@@ -89,6 +94,7 @@ func _init(p_seed: int, p_mode: ArrivalMode, p_items: Array[Item] = [], config: 
 	boss = cfg["boss"]
 	strike_every = cfg["strike_every"]
 	moves_to_strike = strike_every
+	enrage_at = int(cfg["enrage_at"]) if int(cfg["enrage_at"]) >= 0 else ceili(int(cfg["target"]) / 2.0)
 
 	bus = EventBus.new()
 	bus.on(Events.ARRIVE, _on_arrive)
@@ -100,6 +106,7 @@ func _init(p_seed: int, p_mode: ArrivalMode, p_items: Array[Item] = [], config: 
 	var values := DataGen.make_values(cfg["kind"], cfg["start"], vmax, rng)
 	room = Room.new(Algorithms.make(cfg["algorithm"]), Board.new(cfg["capacity"], values),
 			cfg["target"], budget_max, bus, true)
+	room.manual_ship = bool(cfg["ship"])
 	next_value = _roll()
 
 
@@ -141,7 +148,9 @@ func deliver() -> void:
 	timer = 0.0
 	moves_since_arrival = 0
 	var batch: Array[int] = [next_value]
-	if room.board.size() <= 1:
+	# Ship rooms need no batch: nothing leaves for free there, and a free
+	# batch for emptying the board would make shipping everything best.
+	if room.board.size() <= 1 and not room.manual_ship:
 		for i in BATCH_SIZE - 1:
 			batch.append(_roll())
 		batch = room.algorithm.order_batch(batch)
@@ -183,7 +192,7 @@ func moves_until_arrival() -> int:
 func _boss_tick() -> void:
 	if boss != BOSS_ADVERSARY:
 		return
-	if not enraged and room.score * 2 >= room.target:
+	if not enraged and room.score >= enrage_at:
 		enraged = true
 		every_moves = maxi(every_moves - 1, 2)
 		strike_every = maxi(strike_every - 1, 3)

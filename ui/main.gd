@@ -35,6 +35,7 @@ func _ready() -> void:
 	crt = ShaderMaterial.new()
 	crt.shader = CrtShader
 	crt.set_shader_parameter("source_size", Vector2(BASE))
+	crt.set_shader_parameter("enabled", Settings.load_crt())
 
 	screen = TextureRect.new()
 	screen.texture = viewport.get_texture()
@@ -66,7 +67,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED if full else DisplayServer.WINDOW_MODE_FULLSCREEN)
 				return
 			KEY_C:
-				crt.set_shader_parameter("enabled", not bool(crt.get_shader_parameter("enabled")))
+				var on := not bool(crt.get_shader_parameter("enabled"))
+				crt.set_shader_parameter("enabled", on)
+				Settings.save_crt(on)
 				return
 			KEY_L:
 				var next := Settings.next_language(TranslationServer.get_locale().substr(0, 2))
