@@ -120,6 +120,19 @@ var rage_flash := 0.0
 var banner_delay := 0.0
 var banner_t := 9.0
 var demo_timer := 0.0
+## Played when the banner shows (a hand with a pattern, the boss's rage).
+var banner_sound: StringName = &""
+## The end-of-room sound plays once, with the result card.
+var end_sound_done := false
+## The shipment (or classic chain) being scored: its length and mult, so the
+## last number can land with a sound sized to it.
+var ship_total := 0
+var ship_mult := 0
+## Last frame's values, so a sound plays once when a line is crossed.
+var last_ready := 0
+var last_budget := 0
+var last_ships := 0
+var last_free := 0
 var time := 0.0
 
 var font: Font
@@ -171,6 +184,17 @@ func set_session(p_session: RoomSession, p_room_no: int, p_room_total: int, p_ki
 	bus.on(Events.BOSS_DODGED, _on_boss_dodged)
 	bus.on(Events.BOSS_ENRAGED, _on_boss_enraged)
 	bus.on(Events.BOSS_SHIELD, _on_boss_shield)
+	bus.on(Events.ARRIVE, _on_arrive)
+	banner_sound = &""
+	end_sound_done = false
+	ship_total = 0
+	ship_mult = 0
+	last_ready = session.room.ready_count()
+	last_budget = session.room.budget
+	last_ships = session.room.ships_left
+	last_free = session.room.board.capacity - session.room.board.size()
+	if boss_intro_open:
+		Sfx.play(&"boss_intro")
 	_reset_selection()
 	_sync_visuals()
 	# The starting numbers rise into the column one after another, once the
@@ -212,6 +236,7 @@ func _ship() -> void:
 	var n := ship_count()
 	if n > 0 and session.play({"type": Events.SHIP, "count": n}):
 		ship_n = -1
+		Sfx.play(&"ship")
 
 
 ## Q: ship one fewer, wrapping back to all of them.
@@ -220,6 +245,7 @@ func _ship_fewer() -> void:
 	if n == 0:
 		return
 	ship_n = n - 1 if n > 1 else -1
+	Sfx.play(&"cursor")
 
 
 ## Board index of the number under `p`, or -1.
@@ -261,14 +287,17 @@ func handle_input(event: InputEvent, local: Vector2) -> void:
 			if boss_intro_open:
 				boss_intro_open = false
 				overlay_t = 0.0
+				Sfx.play(&"confirm")
 			else:
 				rules_open = false
 				help_open = false
+				Sfx.play(&"card_close")
 		return
 	if event is InputEventKey and event.pressed:
 		var key := event as InputEventKey
 		if is_over():
 			if not key.echo and key.keycode in [KEY_SPACE, KEY_ENTER]:
+				Sfx.play(&"confirm")
 				continue_pressed.emit()
 			return
 		match key.keycode:
@@ -293,10 +322,12 @@ func handle_input(event: InputEvent, local: Vector2) -> void:
 				if not key.echo:
 					help_open = true
 					overlay_t = 0.0
+					Sfx.play(&"card_open")
 			KEY_I:
 				if not key.echo:
 					rules_open = true
 					overlay_t = 0.0
+					Sfx.play(&"card_open")
 	elif event is InputEventMouseMotion:
 		hover = _target_at(local)
 		var row := _item_row_at(local)
@@ -321,6 +352,7 @@ func handle_input(event: InputEvent, local: Vector2) -> void:
 							ship_n = d
 			MOUSE_BUTTON_LEFT:
 				if is_over():
+					Sfx.play(&"confirm")
 					continue_pressed.emit()
 					return
 				var j := _target_at(local)
@@ -329,6 +361,7 @@ func handle_input(event: InputEvent, local: Vector2) -> void:
 						_act(j)
 					else:
 						selected = j
+						Sfx.play(&"cursor")
 
 
 ## +1 = towards the exit (up on screen) for both algorithms.
@@ -336,8 +369,11 @@ func _step_selection(direction: int) -> void:
 	var lo_hi := _selection_range()
 	if lo_hi.y < lo_hi.x:
 		return
+	var before := selected
 	selected += direction if is_bubble() else -direction
 	selected = clampi(selected, lo_hi.x, lo_hi.y)
+	if selected != before:
+		Sfx.play(&"cursor")
 
 
 ## Bubble: pairs 0..size-2. Insertion: places 0..k-1 before the key at k.
@@ -401,6 +437,8 @@ func _item_row_at(p: Vector2) -> int:
 # --- bus events --------------------------------------------------------------
 
 func _on_swap(data: Dictionary) -> void:
+	if not data["wrong"]:
+		Sfx.play(&"swap")
 	var j: int = data["move"]["index"]
 	var cells := session.room.board.cells
 	pending_arc[cells[j].uid] = -12.0
@@ -408,11 +446,14 @@ func _on_swap(data: Dictionary) -> void:
 
 
 func _on_insert(data: Dictionary) -> void:
+	if not data["wrong"]:
+		Sfx.play(&"insert")
 	var p: int = data["move"]["to"]
 	pending_arc[session.room.board.cells[p].uid] = 22.0  # the key swings out and in
 
 
 func _on_wrong(data: Dictionary) -> void:
+	Sfx.play(&"wrong")
 	var move: Dictionary = data["move"]
 	var j: int = move.get("index", move.get("to", 0))
 	if is_bubble():
@@ -446,6 +487,9 @@ func _on_chain(data: Dictionary) -> void:
 		return  # the hand banner says more
 	var length: int = data["length"]
 	banner_text = tr("CHAIN_BANNER") % length
+	banner_sound = &"pattern"
+	ship_total = length
+	ship_mult = mini(length, Room.CHAIN_CAP)
 	banner_sub = ""
 	banner_color = Palette.GOLD
 	banner_delay = SWAP_DUR + (length - 1) * CHAIN_STEP + RISE_DUR
@@ -458,6 +502,11 @@ func _on_hand(data: Dictionary) -> void:
 	banner_text = "×%d" % int(data["mult"])
 	banner_sub = hand_names(data["patterns"])
 	banner_color = Palette.GOLD if not (data["patterns"] as Array).is_empty() else Palette.TEXT
+	banner_sound = &"pattern" if not (data["patterns"] as Array).is_empty() else &""
+	ship_total = count
+	ship_mult = int(data["mult"])
+	if _is_fanfare():
+		banner_sound = &""  # the fanfare on the last number says it already
 	banner_delay = SWAP_DUR + (count - 1) * CHAIN_STEP + RISE_DUR
 	banner_t = -1.0
 
@@ -474,6 +523,7 @@ func _on_overflow(data: Dictionary) -> void:
 	if data["absorbed"]:
 		_float(tr("FUSE_BLOWN"), Vector2(TANK_CX + TANK_W * 0.5 + 14, TANK_TOP + 60), Palette.GOLD, S)
 		return
+	Sfx.play(&"overflow")
 	shake = 5.0
 	tank_flash = 0.5
 	_float(tr("OVERFLOW"), Vector2(TANK_CX + TANK_W * 0.5 + 14, TANK_TOP + 60), Palette.BAD, S)
@@ -481,6 +531,7 @@ func _on_overflow(data: Dictionary) -> void:
 
 func _on_item_triggered(data: Dictionary) -> void:
 	var id: StringName = data["id"]
+	Sfx.play(&"item")
 	item_flash[id] = 0.6
 	focus_item = id
 	var label: String = data.get("label", "")
@@ -490,9 +541,11 @@ func _on_item_triggered(data: Dictionary) -> void:
 
 func _on_boss_aim(_data: Dictionary) -> void:
 	aim_t = 0.0
+	Sfx.play(&"boss_aim")
 
 
 func _on_boss_strike(data: Dictionary) -> void:
+	Sfx.play(&"boss_strike")
 	if data["mode"] == RoomSession.STRIKE_THROW:
 		shake = 5.0
 		tank_flash = 0.5
@@ -513,6 +566,7 @@ func _on_boss_strike(data: Dictionary) -> void:
 
 func _on_boss_enraged(_data: Dictionary) -> void:
 	banner_text = tr("BOSS_ENRAGED")
+	banner_sound = &"boss_enraged"
 	banner_sub = ""
 	banner_color = Palette.BAD
 	banner_delay = 0.0
@@ -523,12 +577,14 @@ func _on_boss_enraged(_data: Dictionary) -> void:
 
 ## The phase shield stopped points: say how many, in shield blue.
 func _on_boss_shield(data: Dictionary) -> void:
+	Sfx.play(&"shield")
 	var text := tr("BOSS_SHIELD") % int(data["blocked"])
 	var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, M).x
 	_float(text, Vector2(TANK_CX - w * 0.5, TANK_TOP + 90), Palette.CHIPS, M)
 
 
 func _on_boss_dodged(_data: Dictionary) -> void:
+	Sfx.play(&"boss_dodged")
 	var text := tr("BOSS_DODGED")
 	var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, M).x
 	_float(text, Vector2(TANK_CX - w * 0.5, TANK_TOP + 120), Palette.GOOD, M)
@@ -561,6 +617,11 @@ func _process(delta: float) -> void:
 	intro_t += delta
 	overlay_t += delta
 	end_t = end_t + delta if is_over() else 0.0
+	_sound_cues()
+	if is_over() and not end_sound_done:
+		end_sound_done = true
+		var won := session.room.state == Room.State.WON
+		Sfx.play((&"boss_defeated" if is_boss() else &"room_won") if won else &"room_lost")
 	aim_t += delta
 	var paused := boss_intro_open or rules_open or help_open
 	if demo and boss_intro_open and overlay_t > 2.0:
@@ -617,6 +678,9 @@ func _process(delta: float) -> void:
 		banner_delay -= delta
 		if banner_delay <= 0.0:
 			banner_t = 0.0
+			if banner_sound != &"":
+				Sfx.play(banner_sound)
+				banner_sound = &""
 	else:
 		banner_t += delta
 
@@ -681,6 +745,16 @@ func _update_ghosts(delta: float) -> void:
 
 
 func _pop(g: Ghost) -> void:
+	Sfx.play(&"score", Sfx.score_pitch(g.chain))
+	if g.chain >= 4:
+		Sfx.play(&"chips", Sfx.score_pitch(g.chain))
+	if not g.effects.is_empty():
+		Sfx.play(&"item")
+	if g.chain == ship_total and ship_total >= 3:
+		# The last number of a long shipment: a handful of chips, bigger the longer it was.
+		Sfx.play(&"combo_big" if ship_total >= 7 else (&"combo_mid" if ship_total >= 5 else &"combo_small"))
+		if _is_fanfare():
+			Sfx.play(&"combo_fanfare")
 	score_target += g.gained
 	last_points = g.points
 	last_mult = g.mult
@@ -799,12 +873,13 @@ func _draw_left_panel() -> void:
 	_panel(Rect2(x, 164, w, 30))
 	_text(tr("LIVES"), Vector2(x + 8, 184), S, Palette.MUTED)
 	for i in session.max_lives:
-		var r := Rect2(x + 62 + i * 16, 173, 11, 11)
-		if i < session.lives:
-			draw_rect(r, Palette.BAD)
-		else:
-			draw_rect(r, Palette.PANEL_EDGE, false, 1.0)
-	_text("%s %d" % [tr("BITS"), bits], Vector2(x + 8, 184), S, Palette.GOLD, right, w - 16)
+		var r := Rect2(x + 58 + i * 18, 171, 16, 16)
+		Icons.draw_glyph(self, &"heart" if i < session.lives else &"heart_empty", r,
+				Palette.BAD if i < session.lives else Palette.PANEL_EDGE.lightened(0.2))
+	var bits_text := "%s %d" % [tr("BITS"), bits]
+	var bits_w := font.get_string_size(bits_text, HORIZONTAL_ALIGNMENT_LEFT, -1, S).x
+	Icons.draw_glyph(self, &"coin", Rect2(x + w - 8 - bits_w - 20, 171, 16, 16), Palette.GOLD)
+	_text(bits_text, Vector2(x + 8, 184), S, Palette.GOLD, right, w - 16)
 
 	if is_ship():
 		_draw_ship_box(Rect2(x, 200, w, 50))
@@ -1391,3 +1466,34 @@ static func load_pixel_font() -> Font:
 
 static func _ease_in_out(p: float) -> float:
 	return p * p * (3.0 - 2.0 * p)
+
+
+func _on_arrive(_data: Dictionary) -> void:
+	Sfx.play(&"arrive")
+
+
+## A very long shipment, or a very big mult, gets a fanfare.
+func _is_fanfare() -> bool:
+	return ship_total >= 7 or ship_mult >= 15
+
+
+## Sounds for lines crossed between frames: a number joining the ready run,
+## the last shipment, few moves left, a column one number from full.
+func _sound_cues() -> void:
+	var room := session.room
+	if not session.is_playing():
+		return
+	var ready := room.ready_count() if is_ship() else 0
+	if ready > last_ready:
+		Sfx.play(&"ready", Sfx.score_pitch(ready))
+	last_ready = ready
+	if room.ships_left == 1 and last_ships > 1:
+		Sfx.play(&"warning")
+	elif room.budget <= 5 and last_budget > 5:
+		Sfx.play(&"warning")
+	last_ships = room.ships_left
+	last_budget = room.budget
+	var free := room.board.capacity - room.board.size()
+	if free == 1 and last_free > 1:
+		Sfx.play(&"danger")
+	last_free = free

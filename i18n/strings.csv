@@ -29,11 +29,11 @@ OUT_OF_SHIPS,out of shipments,skończyły się wysyłki
 SCORE_OF,score %d / %d,wynik %d / %d
 END_STATS,chain ×%d   wrong moves %d   moves left %d,łańcuch ×%d   złe ruchy %d   zostało ruchów %d
 ITEM_SIEVE_NAME,Sieve of Eratosthenes,Sito Eratostenesa
-ITEM_SIEVE_DESC,A prime that surfaces adds its own value to the mult.,Zaliczona liczba pierwsza: + jej wartość do mnożnika.
+ITEM_SIEVE_DESC,A scored prime adds half its value (rounded up) to its mult.,Zaliczona liczba pierwsza: + połowa jej wartości (w górę) do mnożnika.
 ITEM_BUBBLE_PUMP_NAME,Bubble Pump,Bubble Pump
 ITEM_BUBBLE_PUMP_DESC,From the 3rd link of a chain: +2 mult.,Od 3. ogniwa łańcucha: +2 do mnożnika.
 ITEM_DOUBLER_NAME,Doubler,Podwajacz
-ITEM_DOUBLER_DESC,Every surfacing: mult ×2.,Mnożnik każdego zaliczenia ×2.
+ITEM_DOUBLER_DESC,"Every second number of a shipment or chain: mult ×2.",Co druga liczba wysyłki lub łańcucha: mnożnik ×2.
 ITEM_WARM_CACHE_NAME,Warm Cache,Ciepły cache
 ITEM_WARM_CACHE_DESC,The first move in a room is free.,Pierwszy ruch w pokoju nic nie kosztuje.
 ITEM_PARITY_BIT_NAME,Parity Bit,Bit parzystości
@@ -145,6 +145,7 @@ MENU_KEYS_PAUSE,W S: choose   SPACE / ENTER: confirm   ESC: resume,W S: wybór  
 MENU_KEYS_BACK,W S: choose   A D: change   ESC: back,W S: wybór   A D: zmiana   ESC: wstecz
 SET_TITLE,SETTINGS,USTAWIENIA
 SET_LANGUAGE,Language,Język
+SET_VOLUME,Sound volume,Głośność
 SET_CRT,CRT effect,Efekt CRT
 SET_FULLSCREEN,Fullscreen,Pełny ekran
 SET_ARRIVALS,New numbers,Nowe liczby

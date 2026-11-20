@@ -24,15 +24,16 @@ const MENU_W := 320.0
 const PAGES := {
 	Page.TITLE: [&"play", &"demo", &"settings", &"quit"],
 	Page.PAUSE: [&"resume", &"settings", &"to_title", &"quit"],
-	Page.SETTINGS: [&"language", &"crt", &"fullscreen", &"arrivals", &"back"],
+	Page.SETTINGS: [&"language", &"volume", &"crt", &"fullscreen", &"arrivals", &"back"],
 }
 const LABELS := {
 	&"play": "MENU_PLAY", &"demo": "MENU_DEMO", &"settings": "MENU_SETTINGS", &"quit": "MENU_QUIT",
 	&"resume": "MENU_RESUME", &"to_title": "MENU_TO_TITLE", &"back": "MENU_BACK",
-	&"language": "SET_LANGUAGE", &"crt": "SET_CRT", &"fullscreen": "SET_FULLSCREEN", &"arrivals": "SET_ARRIVALS",
+	&"language": "SET_LANGUAGE", &"volume": "SET_VOLUME", &"crt": "SET_CRT", &"fullscreen": "SET_FULLSCREEN", &"arrivals": "SET_ARRIVALS",
 }
 ## Rows that change a value (A / D, arrows, click).
-const VALUES: Array[StringName] = [&"language", &"crt", &"fullscreen", &"arrivals"]
+const VALUES: Array[StringName] = [&"language", &"volume", &"crt", &"fullscreen", &"arrivals"]
+const VOLUME_STEP := 10
 
 ## A few numbers that bubble-sort themselves behind the title.
 const BG_COUNT := 14
@@ -50,6 +51,7 @@ var font: Font
 var crt := true
 var fullscreen := false
 var arrival_mode := RoomSession.ArrivalMode.TURNS
+var volume := 80
 
 var _bg: Array[Dictionary] = []  # {"value": int, "x": float} in slot order
 var _bg_j := 0
@@ -82,8 +84,10 @@ func handle_input(event: InputEvent, local: Vector2) -> void:
 		match key.keycode:
 			KEY_UP, KEY_W:
 				selected = (selected - 1 + items().size()) % items().size()
+				Sfx.play(&"cursor")
 			KEY_DOWN, KEY_S:
 				selected = (selected + 1) % items().size()
+				Sfx.play(&"cursor")
 			KEY_LEFT, KEY_A:
 				if not key.echo:
 					_change(items()[selected], -1)
@@ -98,8 +102,9 @@ func handle_input(event: InputEvent, local: Vector2) -> void:
 					back()
 	elif event is InputEventMouseMotion:
 		var row := _row_at(local)
-		if row >= 0:
+		if row >= 0 and row != selected:
 			selected = row
+			Sfx.play(&"cursor")
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		var row := _row_at(local)
 		if row >= 0:
@@ -109,6 +114,8 @@ func handle_input(event: InputEvent, local: Vector2) -> void:
 
 ## ESC: settings go back where they came from, the pause menu resumes.
 func back() -> void:
+	if page != Page.TITLE:
+		Sfx.play(&"back")
 	match page:
 		Page.SETTINGS:
 			var from := settings_from
@@ -122,6 +129,8 @@ func _activate(id: StringName) -> void:
 	if id in VALUES:
 		_change(id, 1)
 		return
+	if id != &"back":
+		Sfx.play(&"confirm")
 	match id:
 		&"play":
 			play_pressed.emit()
@@ -143,6 +152,8 @@ func _activate(id: StringName) -> void:
 ## Changes a setting one step (every setting has two values, except the
 ## language list, which wraps around) and saves it.
 func _change(id: StringName, direction: int) -> void:
+	if not id in VALUES:
+		return
 	match id:
 		&"language":
 			var langs := Settings.LANGUAGES
@@ -150,6 +161,12 @@ func _change(id: StringName, direction: int) -> void:
 			var next := langs[(i + direction + langs.size()) % langs.size()]
 			TranslationServer.set_locale(next)
 			Settings.save_language(next)
+		&"volume":
+			# Wraps from 100 to 0 going up (SPACE, click) and from 0 to 100 going down.
+			var steps := 100 / VOLUME_STEP + 1
+			volume = ((volume / VOLUME_STEP + direction + steps) % steps) * VOLUME_STEP
+			Settings.save_volume(volume)
+			Sfx.set_volume(volume)
 		&"crt":
 			crt = not crt
 			Settings.save_crt(crt)
@@ -162,12 +179,15 @@ func _change(id: StringName, direction: int) -> void:
 					else RoomSession.ArrivalMode.TURNS
 			Settings.save_arrival_mode(arrival_mode)
 			arrival_mode_changed.emit(arrival_mode)
+	Sfx.play(&"toggle")
 
 
 func _value_text(id: StringName) -> String:
 	match id:
 		&"language":
 			return Settings.LANGUAGE_NAMES.get(TranslationServer.get_locale().substr(0, 2), "?")
+		&"volume":
+			return "%d%%" % volume if volume > 0 else tr("SET_OFF")
 		&"crt":
 			return tr("SET_ON") if crt else tr("SET_OFF")
 		&"fullscreen":

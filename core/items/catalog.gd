@@ -44,22 +44,26 @@ static func bubble_pump() -> Item:
 				ctx.apply(&"bubble_pump", ScoreContext.MULT, 2))
 
 
-## A prime that surfaces adds its own value to the mult.
+## A prime that scores adds half its value (rounded up) to its mult. (Its
+## whole value made Sieve + Doubler win rooms with one shipment.)
 static func sieve() -> Item:
 	return Item.new(&"sieve", [Events.SURFACE, NumberProps.PRIME]) \
 		.react(Events.SURFACE, func(data: Dictionary) -> void:
 			var ctx: ScoreContext = data["ctx"]
 			if NumberProps.is_prime(ctx.element.value):
-				ctx.apply(&"sieve", ScoreContext.MULT, ctx.element.value))
+				ctx.apply(&"sieve", ScoreContext.MULT, ceili(ctx.element.value / 2.0)))
 
 
-## Doubles the mult of every surfacing. Order against other items matters:
-## after Sieve it doubles Sieve's bonus too.
+## Every second number of a shipment or chain (the 2nd, 4th, ...) gets mult
+## ×2. Order against other items matters: after Sieve it doubles Sieve's
+## bonus too. (Every number made it the best item by far: a hand's mult is
+## already large before any item.)
 static func doubler() -> Item:
 	return Item.new(&"doubler", [Events.SURFACE]) \
 		.react(Events.SURFACE, func(data: Dictionary) -> void:
 			var ctx: ScoreContext = data["ctx"]
-			ctx.apply(&"doubler", ScoreContext.XMULT, 2))
+			if ctx.chain % 2 == 0:
+				ctx.apply(&"doubler", ScoreContext.XMULT, 2))
 
 
 ## An even number that surfaces: +20 points.

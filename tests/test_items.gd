@@ -8,12 +8,20 @@ func _room_with(items: Array, values: Array = [1, 3, 2]) -> Room:
 	return bubble_room(values, 1_000_000, 5, -1, bus)
 
 
-func test_sieve_adds_prime_values_to_mult() -> void:
+func test_sieve_adds_half_a_primes_value_to_mult() -> void:
 	var room := _room_with([ItemCatalog.sieve()])
 	room.start()
 	room.play({"type": Events.SWAP, "index": 1})
-	# 3: 30×(1+3)  2: 20×(2+2)  1: 10×3
-	check_eq(room.score, 120 + 80 + 30, "score")
+	# 3: 30×(1+2)  2: 20×(2+1)  1: 10×3   (half the prime, rounded up)
+	check_eq(room.score, 90 + 60 + 30, "score")
+
+
+func test_doubler_doubles_every_second_number() -> void:
+	var room := _room_with([ItemCatalog.doubler()], [1, 2, 3, 4])
+	room.start()
+	# links 1..4 with chain mult 1..4; the 2nd and 4th are doubled:
+	# 40×1 + 30×(2×2) + 20×3 + 10×(4×2)
+	check_eq(room.score, 40 + 120 + 60 + 80, "score")
 
 
 ## Slot order is effect order, as with jokers.
@@ -21,14 +29,14 @@ func test_item_order_changes_the_result() -> void:
 	var a := _room_with([ItemCatalog.sieve(), ItemCatalog.doubler()])
 	a.start()
 	a.play({"type": Events.SWAP, "index": 1})
-	# (mult + prime) × 2:  30×8 + 20×8 + 10×6
-	check_eq(a.score, 240 + 160 + 60, "sieve then doubler")
+	# 3 (link 1): 30×(1+2)   2 (link 2, doubled): 20×((2+1)×2)   1: 10×3
+	check_eq(a.score, 90 + 120 + 30, "sieve then doubler")
 
 	var b := _room_with([ItemCatalog.doubler(), ItemCatalog.sieve()])
 	b.start()
 	b.play({"type": Events.SWAP, "index": 1})
-	# mult × 2 + prime:  30×5 + 20×6 + 10×6
-	check_eq(b.score, 150 + 120 + 60, "doubler then sieve")
+	# 2 (link 2): 20×(2×2+1); the rest as above
+	check_eq(b.score, 90 + 100 + 30, "doubler then sieve")
 
 
 func test_bubble_pump_needs_long_chains() -> void:

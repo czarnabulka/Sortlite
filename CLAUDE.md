@@ -51,6 +51,18 @@ not the repo.
   and font glyphs; menu labels go through `MenuView.LABELS`.
 - Text is drawn only at 16, 20 and 32 px (`S`, `M`, `L`); other sizes blur
   the pixel font.
+- Sounds: screens call `Sfx.play(&"name")`; every name is a row in
+  `Sfx.SOUNDS` (`ui/sfx.gd`: files, volume, pitch spread), and the files are
+  Kenney CC0 packs in `assets/sounds/kenney/`. `tests/test_sfx.gd` checks that
+  every file loads, every played name exists and no file goes unused. You
+  cannot hear the sounds: pick them by name, length and loudness (the 8-bit
+  jingles by their pitch going up or down), and say the user should listen.
+- Icons are 16×16 cells of Kenney's 1-Bit Pack (`assets/icons/kenney_1bit.png`,
+  49×22 cells), tinted when drawn; `ui/icons.gd` maps items, the boss and UI
+  glyphs to cells. Check a new cell by rendering it: neighbouring cells are
+  easy to mix up. `tests/test_icons.gd` checks every item has a non-empty cell.
+- `tools/shot.gd -- --items a,b,c` gives the run items; `--screen reward`
+  shows the item choice.
 - Files use LF line endings. Python on Windows writes CRLF in text mode, so
   open files with `newline=""` (or `"\n"`) when editing them from a script.
 - Player settings are saved in `user://settings.cfg` on the user's machine.
@@ -82,8 +94,13 @@ only apply to this machine go in `CLAUDE.local.md`.
 ## Where things stand
 
 - Released: 0.2 (shipment limits, boss phase shield). Since then: title
-  screen, settings and pause menu; README rewrite.
-- Open questions: Sieve + Doubler can decide a normal room with one shipment;
+  screen, settings and pause menu; README rewrite; sound effects with a
+  volume setting, combo and warning sounds, 8-bit jingles, and icons from the
+  1-Bit Pack (sounds not yet listened to by a person); a light nerf of Sieve
+  (half a prime's value) and Doubler (every second number).
+- Open questions: are strong builds rewarded right (after the Sieve and
+  Doubler nerf, Sieve + Doubler + Bubble Pump + Power Tower scores about 3×
+  a room's target, was 5×);
   values are 1–12 (patterns would like a wider range); keep or drop classic
   rooms (`--classic`); does Insertion's ship decision feel real to players.
 - Next steps: the Roadmap section of the design document.

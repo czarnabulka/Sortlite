@@ -26,6 +26,15 @@ static func save_crt(on: bool) -> void:
 	_save("crt", on)
 
 
+## Sound volume, 0..100 in steps of 10 (0 = off).
+static func load_volume() -> int:
+	return clampi(int(_load("volume", 80)), 0, 100)
+
+
+static func save_volume(percent: int) -> void:
+	_save("volume", percent)
+
+
 static func load_fullscreen() -> bool:
 	return bool(_load("fullscreen", false))
 

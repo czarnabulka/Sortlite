@@ -25,6 +25,8 @@ func _ready() -> void:
 	var lang := Settings.language_from_args()
 	TranslationServer.set_locale(lang if lang != "" else Settings.load_language())
 	_apply_fullscreen(Settings.load_fullscreen())
+	add_child(Sfx.new())
+	Sfx.set_volume(Settings.load_volume())
 
 	var bg := ColorRect.new()
 	bg.color = Color.BLACK
@@ -48,6 +50,7 @@ func _ready() -> void:
 	menu.crt = Settings.load_crt()
 	menu.fullscreen = Settings.load_fullscreen()
 	menu.arrival_mode = Settings.load_arrival_mode()
+	menu.volume = Settings.load_volume()
 	menu.play_pressed.connect(func() -> void: start_run(false))
 	menu.demo_pressed.connect(func() -> void: start_run(true))
 	menu.resume_pressed.connect(resume)

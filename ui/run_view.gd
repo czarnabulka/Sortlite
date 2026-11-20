@@ -88,6 +88,8 @@ func _show_phase() -> void:
 	picking = -1
 	card_lift = [0.0, 0.0, 0.0]
 	room_view.visible = run.phase == Run.Phase.ROOM
+	if run.phase == Run.Phase.REWARD:
+		Sfx.play(&"deal")
 	if run.phase == Run.Phase.ROOM:
 		var algo: StringName = run.current_room()["algorithm"]
 		var first_time := not seen_rules.has(algo)
@@ -125,18 +127,20 @@ func handle_input(event: InputEvent, local: Vector2) -> void:
 		return
 	if run.phase == Run.Phase.WON or run.phase == Run.Phase.LOST:
 		if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_R:
+			Sfx.play(&"confirm")
 			_fade_to(func() -> void: new_run(randi() % 100000))
 		return
 	# Reward phase
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
 			KEY_LEFT, KEY_A:
-				selected_card = maxi(selected_card - 1, 0)
+				_select_card(maxi(selected_card - 1, 0))
 			KEY_RIGHT, KEY_D:
-				selected_card = mini(selected_card + 1, run.offer.size() - 1)
+				_select_card(mini(selected_card + 1, run.offer.size() - 1))
 			KEY_SPACE, KEY_ENTER:
 				_pick(selected_card)
 			KEY_S:
+				Sfx.play(&"skip")
 				_fade_to(func() -> void:
 					run.skip()
 					_show_phase())
@@ -144,12 +148,15 @@ func handle_input(event: InputEvent, local: Vector2) -> void:
 				if run.reroll():
 					selected_card = 0
 					screen_t = 0.15  # cards deal in again, map stays
+					Sfx.play(&"deal")
+				else:
+					Sfx.play(&"wrong")
 			KEY_E:
-				run.heal()
+				Sfx.play(&"heal" if run.heal() else &"wrong")
 	elif event is InputEventMouseMotion:
 		var hover := _card_at(local)
 		if hover >= 0:
-			selected_card = hover
+			_select_card(hover)
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		var i := _card_at(local)
 		if i >= 0:
@@ -161,10 +168,18 @@ func _pick(i: int) -> void:
 		return
 	if run.slots_full():
 		full_flash = 1.0  # the "slots full" line flashes; S skips instead
+		Sfx.play(&"wrong")
 		return
+	Sfx.play(&"take")
 	selected_card = i
 	picking = i
 	pick_t = 0.0
+
+
+func _select_card(i: int) -> void:
+	if i != selected_card:
+		selected_card = i
+		Sfx.play(&"card_hover")
 
 
 func _card_rect(i: int) -> Rect2:
@@ -334,12 +349,11 @@ func _draw_reward() -> void:
 	var y := 322.0
 	_text(tr("LIVES"), Vector2(16, y), S, _a(Palette.MUTED, b))
 	for i in run.max_lives:
-		var r := Rect2(66 + i * 16, y - 11, 11, 11)
-		if i < run.lives:
-			draw_rect(r, _a(Palette.BAD, b))
-		else:
-			draw_rect(r, _a(Palette.PANEL_EDGE, b), false, 1.0)
-	_text("%s %d" % [tr("BITS"), run.bits], Vector2(130, y), S, _a(Palette.GOLD, b))
+		var r := Rect2(62 + i * 18, y - 13, 16, 16)
+		Icons.draw_glyph(self, &"heart" if i < run.lives else &"heart_empty", r,
+				_a(Palette.BAD if i < run.lives else Palette.PANEL_EDGE.lightened(0.2), b))
+	Icons.draw_glyph(self, &"coin", Rect2(130, y - 13, 16, 16), _a(Palette.GOLD, b))
+	_text("%s %d" % [tr("BITS"), run.bits], Vector2(150, y), S, _a(Palette.GOLD, b))
 	_text(tr("REWARD_KEYS") % [Run.SKIP_BITS, Run.REROLL_COST, Run.HEAL_COST], Vector2(16, y + 22), S, _a(Palette.TEXT, b))
 
 

@@ -17,8 +17,8 @@ godot --path .
 ```
 
 The game opens on the title screen: new run, a demo where the bot plays,
-settings (language, CRT effect, fullscreen, arrivals by moves or by time) and
-quit. ESC during a run opens the pause menu.
+settings (language, sound volume, CRT effect, fullscreen, arrivals by moves
+or by time) and quit. ESC during a run opens the pause menu.
 
 Options after `--`, for testing: `--seed 123` replays a run, `--demo` lets the
 bot play, `--skip 3` jumps to a room (3 = the boss); these three start a run
@@ -77,7 +77,7 @@ the older rooms where sorted numbers leave by themselves.
 | `sim/` | balance simulator |
 | `tests/` | tests that run without a window |
 | `i18n/` | all text: `strings.csv` with `keys`, `en` and `pl` columns |
-| `assets/` | the font |
+| `assets/` | the font, the sound effects and the icon sheet |
 
 Room settings (targets, moves, shipments, arrival pace) live in the `ROOMS`
 table in [core/run.gd](core/run.gd), and the items in

@@ -5,9 +5,10 @@ extends SceneTree
 ##
 ##   godot --path . -s res://tools/shot.gd -- --screen room --room 1 --moves 8 --lang pl --out shot.png
 ##
-## --screen   title | settings | pause | room (default room)
+## --screen   title | settings | pause | room | reward (default room)
 ## --room N   room of the floor plan, 0..3 (3 = the boss); room and pause only
 ## --moves N  moves the smart bot plays first (default 6)
+## --items a,b,c   item ids the run holds (room and reward screens)
 ## --rules / --help / --intro   open the rules card / controls card / boss card
 ## --sel N    selected row on the settings page
 ## --lang     en | pl (default en)
@@ -42,8 +43,13 @@ func _process(_delta: float) -> bool:
 			main.menu.settings_from = main.MenuView.Page.TITLE
 			main.menu.open(main.MenuView.Page.SETTINGS)
 			main.menu.selected = int(_arg("--sel", "0"))
-		elif screen in ["room", "pause"]:
+		elif screen in ["room", "pause", "reward"]:
 			main.start_run(false)
+			for id in _arg("--items", "").split(",", false):
+				main.view.run.items.append(ItemCatalog.make(StringName(id)))
+			if screen == "reward":
+				main.view.run.cleared = int(_arg("--room", "1"))
+				main.view._show_phase()
 	if frames == 5 and screen in ["room", "pause"]:
 		var view = main.view
 		view.run.cleared = int(_arg("--room", "1"))
