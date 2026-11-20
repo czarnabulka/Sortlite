@@ -71,6 +71,14 @@ not the repo.
   `gh` is not installed, so GitHub pages and the repo description are set by
   the user.
 
+## Keeping this file current
+
+When a change adds a command, a tool, a convention or a design decision, or
+finishes a release, update this file in the same commit. Keep it short:
+remove what is no longer true instead of adding notes beside it. The
+balance numbers above and "Where things stand" go stale first. Details that
+only apply to this machine go in `CLAUDE.local.md`.
+
 ## Where things stand
 
 - Released: 0.2 (shipment limits, boss phase shield). Since then: title
