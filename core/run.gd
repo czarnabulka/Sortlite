@@ -154,10 +154,18 @@ func slots_full() -> bool:
 	return items.size() >= MAX_SLOTS
 
 
-func take(index: int) -> bool:
-	if phase != Phase.REWARD or index < 0 or index >= offer.size() or slots_full():
+## Takes offer card `index`. With every slot full, `replace` names the slot
+## the new item goes into: the old item there is dropped, and the slot order
+## (the order items act in) stays as it was.
+func take(index: int, replace := -1) -> bool:
+	if phase != Phase.REWARD or index < 0 or index >= offer.size():
 		return false
-	items.append(offer[index])
+	if slots_full():
+		if replace < 0 or replace >= items.size():
+			return false
+		items[replace] = offer[index]
+	else:
+		items.append(offer[index])
 	_start_room()
 	return true
 

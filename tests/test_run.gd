@@ -128,7 +128,24 @@ func test_full_slots_refuse_a_pick_but_allow_a_skip() -> void:
 	for id in ItemCatalog.IDS.slice(0, Run.MAX_SLOTS):
 		run.items.append(ItemCatalog.make(id))
 	check(run.slots_full(), "full")
-	check(not run.take(0), "no room for another item")
+	check(not run.take(0), "no room for another item without naming one to drop")
+	check(not run.take(0, Run.MAX_SLOTS), "the slot to drop must exist")
 	check_eq(run.phase, Run.Phase.REWARD, "still choosing")
 	check(run.skip(), "skip still works")
 	check_eq(run.phase, Run.Phase.ROOM, "room started")
+
+
+func test_full_slots_replace_an_item_in_its_slot() -> void:
+	var run := Run.new(8)
+	for id in ItemCatalog.IDS.slice(0, Run.MAX_SLOTS):
+		run.items.append(ItemCatalog.make(id))
+	var before: Array = run.items.map(func(it: Item) -> StringName: return it.id)
+	var taken := run.offer[1]
+	check(run.take(1, 2), "replace slot 2")
+	check_eq(run.items.size(), Run.MAX_SLOTS, "still full")
+	check_eq(run.items[2], taken, "the new item sits in slot 2")
+	for k in Run.MAX_SLOTS:
+		if k != 2:
+			check_eq(run.items[k].id, before[k], "slot %d kept" % k)
+	check(run.session.items.has(taken), "the new item is in the room")
+	check(not run.session.items.any(func(it: Item) -> bool: return it.id == before[2]), "the dropped one is not")

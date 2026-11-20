@@ -10,6 +10,7 @@ extends SceneTree
 ## --moves N  moves the smart bot plays first (default 6)
 ## --items a,b,c   item ids the run holds (room and reward screens)
 ## --rules / --help / --intro   open the rules card / controls card / boss card
+## --replace  on the reward screen with full slots: choosing the item to drop
 ## --sel N    selected row on the settings page
 ## --lang     en | pl (default en)
 ## --frame N  frame to capture at (default 90; animations need ~60+, an end card ~400)
@@ -50,6 +51,9 @@ func _process(_delta: float) -> bool:
 			if screen == "reward":
 				main.view.run.cleared = int(_arg("--room", "1"))
 				main.view._show_phase()
+				if args.has("--replace"):
+					main.view._pick(0)
+					main.view.drop_slot = 1
 	if frames == 5 and screen in ["room", "pause"]:
 		var view = main.view
 		view.run.cleared = int(_arg("--room", "1"))

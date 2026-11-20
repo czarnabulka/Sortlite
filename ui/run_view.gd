@@ -40,7 +40,12 @@ var card_lift: Array[float] = [0.0, 0.0, 0.0]
 var picking := -1
 var pick_t := 0.0
 var seen_rules: Dictionary = {}  # algorithm id -> true, per run
-var full_flash := 0.0
+## With every slot full, taking a card first asks which item to drop:
+## the card being taken (-1 = not asking) and the slot picked to drop.
+var replacing := -1
+var drop_slot := 0
+## The slot the card being picked goes into (-1 = a free slot).
+var pick_slot := -1
 
 var _fade_state := 0  # 0 none, 1 going dark, 2 coming back
 var _fade_t := 0.0
@@ -133,6 +138,9 @@ func handle_input(event: InputEvent, local: Vector2) -> void:
 			_fade_to(func() -> void: new_run(randi() % 100000))
 		return
 	# Reward phase
+	if replacing >= 0:
+		_replace_input(event, local)
+		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
 			KEY_LEFT, KEY_A:
@@ -168,14 +176,77 @@ func handle_input(event: InputEvent, local: Vector2) -> void:
 func _pick(i: int) -> void:
 	if i < 0 or i >= run.offer.size():
 		return
+	selected_card = i
 	if run.slots_full():
-		full_flash = 1.0  # the "slots full" line flashes; S skips instead
-		Sfx.play(&"wrong")
+		# Every slot is taken: first choose which item this one replaces.
+		replacing = i
+		drop_slot = 0
+		Sfx.play(&"card_open")
 		return
 	Sfx.play(&"take")
-	selected_card = i
 	picking = i
+	pick_slot = -1
 	pick_t = 0.0
+
+
+## Choosing the item to drop: A D or the mouse pick it, SPACE or a click
+## replaces it, Q or a right-click goes back to the cards.
+func _replace_input(event: InputEvent, local: Vector2) -> void:
+	if event is InputEventKey and event.pressed and not event.echo:
+		match event.keycode:
+			KEY_LEFT, KEY_A, KEY_UP, KEY_W:
+				_select_drop(drop_slot - 1)
+			KEY_RIGHT, KEY_D, KEY_DOWN, KEY_S:
+				_select_drop(drop_slot + 1)
+			KEY_SPACE, KEY_ENTER:
+				_confirm_replace()
+			KEY_Q, KEY_BACKSPACE:
+				_cancel_replace()
+	elif event is InputEventMouseMotion:
+		var k := _slot_at(local)
+		if k >= 0:
+			_select_drop(k)
+	elif event is InputEventMouseButton and event.pressed:
+		if event.button_index == MOUSE_BUTTON_LEFT:
+			var k := _slot_at(local)
+			if k >= 0:
+				drop_slot = k
+				_confirm_replace()
+		elif event.button_index == MOUSE_BUTTON_RIGHT:
+			_cancel_replace()
+
+
+func _select_drop(k: int) -> void:
+	k = clampi(k, 0, run.items.size() - 1)
+	if k != drop_slot:
+		drop_slot = k
+		Sfx.play(&"cursor")
+
+
+func _confirm_replace() -> void:
+	Sfx.play(&"take")
+	picking = replacing
+	pick_slot = drop_slot
+	replacing = -1
+	pick_t = 0.0
+
+
+func _cancel_replace() -> void:
+	replacing = -1
+	Sfx.play(&"back")
+
+
+## The owned items, two rows of three slots under the cards.
+func _slot_rect(k: int) -> Rect2:
+	var w := (608.0 - 2 * 10.0) / 3.0
+	return Rect2(16 + (k % 3) * (w + 10.0), 272 + (k / 3) * 24.0, w, 20)
+
+
+func _slot_at(p: Vector2) -> int:
+	for k in run.items.size():
+		if _slot_rect(k).has_point(p):
+			return k
+	return -1
 
 
 func _select_card(i: int) -> void:
@@ -222,11 +293,11 @@ func _process(delta: float) -> void:
 		pick_t += delta
 		if pick_t >= PICK_DUR and _fade_state == 0:
 			var i := picking
+			var slot := pick_slot
 			_fade_to(func() -> void:
-				run.take(i)
+				run.take(i, slot)
 				_show_phase())
 
-	full_flash = maxf(full_flash - delta * 2.0, 0.0)
 	for i in card_lift.size():
 		var target := 6.0 if i == selected_card and run.phase == Run.Phase.REWARD else 0.0
 		card_lift[i] = lerpf(card_lift[i], target, 1.0 - exp(-14.0 * delta))
@@ -307,9 +378,11 @@ func _draw_map(y: float) -> void:
 
 func _draw_reward() -> void:
 	var title_a := Anim.ease_out_cubic((screen_t - 0.15) / 0.3)
-	if run.slots_full():
-		var c := Palette.BAD.lightened(0.15 + 0.4 * full_flash)
-		_text(tr("SLOTS_FULL"), Vector2(0, 108), M, _a(c, title_a), HORIZONTAL_ALIGNMENT_CENTER, 640)
+	if replacing >= 0:
+		var taking := tr(run.offer[replacing].name_key)
+		_text(tr("REPLACE_TITLE") % taking, Vector2(0, 108), M, _a(Palette.BAD.lightened(0.2), title_a), HORIZONTAL_ALIGNMENT_CENTER, 640)
+	elif run.slots_full():
+		_text(tr("SLOTS_FULL"), Vector2(0, 108), M, _a(Palette.BAD.lightened(0.15), title_a), HORIZONTAL_ALIGNMENT_CENTER, 640)
 	elif run.floor_starts():
 		_text(tr("FLOOR_START") % run.floor_no(), Vector2(0, 108), M, _a(Palette.GOLD, title_a), HORIZONTAL_ALIGNMENT_CENTER, 640)
 	elif run.current_room()["kind"] == Run.BOSS:
@@ -326,6 +399,8 @@ func _draw_reward() -> void:
 		var r := _card_rect(i)
 		r.position.y += 60.0 * (1.0 - Anim.ease_out_back(enter)) - card_lift[i]
 		var sel := i == selected_card
+		if replacing >= 0 and i != replacing:
+			a *= 0.35  # the card being taken stays lit
 		var s := 1.0
 		if picking >= 0:
 			if i == picking:
@@ -345,15 +420,24 @@ func _draw_reward() -> void:
 				HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 20, S, 4, _a(Palette.SOFT, a))
 		draw_set_transform_matrix(Transform2D.IDENTITY)
 
-	# What you already have, lives, bits and the keys fade in last.
+	# What you already have (one box per slot), lives, bits and the keys fade
+	# in last. While replacing, the item to drop is marked red.
 	var b := Anim.ease_out_cubic((screen_t - 0.35) / 0.3)
-	var names: Array[String] = []
-	for item in run.items:
-		names.append(tr(item.name_key))
-	var owned := ", ".join(names) if not names.is_empty() else tr("NO_ITEMS")
-	draw_multiline_string(font, Vector2(16, 278), "%s %d/%d:  %s" % [tr("YOUR_ITEMS"), run.items.size(), Run.MAX_SLOTS, owned],
-			HORIZONTAL_ALIGNMENT_LEFT, 608, S, 2, _a(Palette.SOFT, b))
-	var y := 322.0
+	_text("%s %d/%d" % [tr("YOUR_ITEMS"), run.items.size(), Run.MAX_SLOTS], Vector2(16, 266), S, _a(Palette.SOFT, b))
+	for k in Run.MAX_SLOTS:
+		var r := _slot_rect(k)
+		if k >= run.items.size():
+			draw_rect(r, _a(Palette.PANEL_EDGE, b * 0.6), false, 1.0)  # a free slot
+			continue
+		var item := run.items[k]
+		var dropping := replacing >= 0 and k == drop_slot
+		var pulse := 0.6 + 0.4 * sin(time * 6.0) if dropping else 1.0
+		_panel(r, _a(Palette.BAD if dropping else Palette.PANEL_EDGE, b * pulse),
+				_a(Palette.PANEL.lerp(Palette.BAD, 0.18) if dropping else Palette.PANEL, b))
+		Icons.draw(self, item.id, Rect2(r.position.x + 2, r.position.y + 2, 16, 16), b)
+		_text(tr(item.name_key), Vector2(r.position.x + 24, r.position.y + 15), S,
+				_a(Palette.BAD.lightened(0.35) if dropping else Palette.TEXT, b))
+	var y := 336.0
 	_text(tr("LIVES"), Vector2(16, y), S, _a(Palette.MUTED, b))
 	for i in run.max_lives:
 		var r := Rect2(62 + i * 18, y - 13, 16, 16)
@@ -361,7 +445,8 @@ func _draw_reward() -> void:
 				_a(Palette.BAD if i < run.lives else Palette.PANEL_EDGE.lightened(0.2), b))
 	Icons.draw_glyph(self, &"coin", Rect2(130, y - 13, 16, 16), _a(Palette.GOLD, b))
 	_text("%s %d" % [tr("BITS"), run.bits], Vector2(150, y), S, _a(Palette.GOLD, b))
-	_text(tr("REWARD_KEYS") % [Run.SKIP_BITS, Run.REROLL_COST, Run.HEAL_COST], Vector2(16, y + 22), S, _a(Palette.TEXT, b))
+	var keys := tr("REPLACE_KEYS") if replacing >= 0 else tr("REWARD_KEYS") % [Run.SKIP_BITS, Run.REROLL_COST, Run.HEAL_COST]
+	_text(keys, Vector2(16, y + 18), S, _a(Palette.TEXT, b))
 
 
 func _draw_end() -> void:

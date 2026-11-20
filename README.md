@@ -30,7 +30,8 @@ three start a run at once. `--lang pl` picks the language for one launch, and
 - A run is two floors of four rooms: two fights, an elite and a boss. Floor 1
   has Bubble and Insertion rooms and the Adversary; floor 2 brings Pancake,
   Quick and the Burnt Stack. Before each room you pick 1 of 3 items (up to
-  6; slot order is the order they act in).
+  6; slot order is the order they act in). With every slot full, a new item
+  replaces one you choose and takes its slot.
 - **Bubble**: swap neighbours; the largest number is ready at the exit.
   **Insertion**: insert the gold key into the sorted part; every number it
   passes costs a move; the smallest number is ready at the exit.
@@ -72,6 +73,7 @@ three start a run at once. `--lang pl` picks the language for one launch, and
 | I | rules of this room |
 | H | controls card |
 | A / D, click, SPACE | between rooms: pick and take an item |
+| A / D, click, SPACE, Q | slots full: choose the item to drop, replace it, Q goes back |
 | S / R / E | between rooms: skip (+3 bits), reroll the offer (2 bits), heal a life (5 bits) |
 | R | new run, on the end screen |
 | F11 | fullscreen |
