@@ -11,6 +11,8 @@ const GREEDY := &"greedy"
 const SMART := &"smart"
 ## SMART ships a plain run (no pattern) once it is this long.
 const SMART_BANK_AT := 4
+## The same when shipments are limited (Room.ships_left).
+const SMART_BANK_AT_LIMITED := 5
 
 
 ## The right sorting move for the board, ignoring the budget. `ready` elements
@@ -72,14 +74,24 @@ static func _smart(session: RoomSession, ready: int) -> Dictionary:
 		return ship
 	if room.budget <= 1:
 		return ship
+	var limited := room.ships_left >= 0
+	# More shipments left than moves: no reason to save them any more.
+	if limited and room.budget <= room.ships_left:
+		return ship
 	if free <= 1:
 		return ship
 	if session.is_aiming_pair() and _aimed_in_run(session, ready):
 		return ship
 	if sort.is_empty():
 		return ship if free == 0 else {}
-	# Bank a run with a pattern before it breaks, or a long one anyway.
-	if not (best["patterns"] as Array).is_empty() or int(best["count"]) >= SMART_BANK_AT:
+	# Bank a run with a pattern before it breaks, or a long one anyway. With
+	# few shipments, a pattern of two (a pair) is not worth one.
+	var count := int(best["count"])
+	var patterned := not (best["patterns"] as Array).is_empty()
+	if limited:
+		if count >= SMART_BANK_AT_LIMITED or (patterned and count >= 3):
+			return ship
+	elif patterned or count >= SMART_BANK_AT:
 		return ship
 	return sort
 

@@ -91,10 +91,45 @@ func test_express_lane_skips_the_ready_run() -> void:
 	check_eq(room.board.values(), [1, 2, 3, 5, 8, 9], "5 carried up to the run")
 
 
-func test_ship_session_refills_with_one_number() -> void:
-	var s := RoomSession.new(3, RoomSession.ArrivalMode.TURNS, [], {"ship": true, "start": 0, "every_moves": 100})
+## A lone number is always "sorted", so refilling an empty ship room with one
+## number let E score forever without sorting anything. The refill is a batch
+## ordered so that nothing is ready until the player sorts it.
+func test_empty_ship_room_refills_with_a_batch_that_needs_sorting() -> void:
+	for algorithm in [Algorithms.BUBBLE, Algorithms.INSERTION]:
+		for seed_value in 40:
+			var s := RoomSession.new(seed_value, RoomSession.ArrivalMode.TURNS, [],
+					{"ship": true, "start": 0, "every_moves": 100, "algorithm": algorithm})
+			s.start()
+			var values := s.room.board.values()
+			check_eq(values.size(), RoomSession.BATCH_SIZE, "%s seed %d: a batch of three" % [algorithm, seed_value])
+			if values.min() != values.max():  # three equal numbers are sorted anyway
+				check_eq(s.room.ready_count(), 0, "%s seed %d: %s ready before sorting" % [algorithm, seed_value, values])
+
+
+## Emptying the board must not bring numbers in faster than the room's pace.
+func test_ship_refill_batch_borrows_the_next_arrivals() -> void:
+	var s := RoomSession.new(5, RoomSession.ArrivalMode.TURNS, [],
+			{"ship": true, "start": 0, "every_moves": 2})
 	s.start()
-	check_eq(s.room.board.size(), 1, "an empty ship room gets one number, not a batch of three")
+	check_eq(s.room.board.size(), 3, "batch of three")
+	check_eq(s.moves_until_arrival(), 3 * 2, "the next two arrivals came early, so the third is due after 6 moves")
+	var classic := RoomSession.new(5, RoomSession.ArrivalMode.TURNS, [], {"start": 0, "every_moves": 2})
+	classic.start()
+	check_eq(classic.moves_until_arrival(), 2, "classic rooms keep their pace")
+
+
+func test_pressing_only_ship_cannot_keep_scoring() -> void:
+	for algorithm in [Algorithms.BUBBLE, Algorithms.INSERTION]:
+		for seed_value in 20:
+			var s := RoomSession.new(seed_value, RoomSession.ArrivalMode.TURNS, [],
+					{"ship": true, "start": 1, "every_moves": 2, "budget": 40, "target": 1_000_000,
+					"algorithm": algorithm})
+			s.start()
+			var presses := 0
+			while s.is_playing() and s.room.ready_count() > 0 and presses < 40:
+				s.play({"type": Events.SHIP, "count": s.room.ready_count()})
+				presses += 1
+			check(presses <= 3, "%s seed %d: E alone shipped %d times in a row" % [algorithm, seed_value, presses])
 
 
 func test_greedy_ships_at_once_smart_keeps_sorting() -> void:
@@ -121,3 +156,45 @@ func test_smart_bot_clears_ship_rooms() -> void:
 		if s.room.state == Room.State.WON:
 			wins += 1
 	check(wins >= 12, "smart wins most first rooms (%d/20)" % wins)
+
+
+func test_ship_limit_counts_down_and_refuses_at_zero() -> void:
+	var room := _ship_room([1, 2, 3, 4])
+	room.ships_left = 2
+	check(room.play({"type": Events.SHIP, "count": 1}), "first shipment")
+	check_eq(room.ships_left, 1, "one left")
+	check(room.play({"type": Events.SHIP, "count": 1}), "second shipment")
+	check_eq(room.ships_left, 0, "none left")
+	check_eq(room.state, Room.State.LOST, "out of shipments below the target: lost")
+	check(not room.play({"type": Events.SHIP, "count": 1}), "no more shipments")
+
+
+func test_last_shipment_can_still_win() -> void:
+	var room := insertion_room([1, 2, 3], 60, 100)
+	room.manual_ship = true
+	room.ships_left = 1
+	room.start()
+	check(room.play({"type": Events.SHIP, "count": 3}), "ship all three")
+	check_eq(room.state, Room.State.WON, "the last shipment met the target")
+
+
+func test_no_ship_moves_offered_without_shipments() -> void:
+	var room := _ship_room([1, 2, 3])
+	room.ships_left = 0
+	for m in room.affordable_moves():
+		check(m.get("type") != Events.SHIP, "SHIP offered with no shipments left")
+
+
+func test_every_ship_room_has_a_limit_and_classic_rooms_none() -> void:
+	for key in Run.ROOMS:
+		var ship := RoomSession.new(1, RoomSession.ArrivalMode.TURNS, [], Run.session_config(Run.ROOMS[key], true))
+		check(ship.room.ships_left > 0, "%s: ship room without a limit" % key)
+		check_eq(ship.ships_max, ship.room.ships_left, "%s: max for the screen" % key)
+		var classic := RoomSession.new(1, RoomSession.ArrivalMode.TURNS, [], Run.session_config(Run.ROOMS[key], false))
+		check_eq(classic.room.ships_left, -1, "%s: classic rooms have no limit" % key)
+
+
+func test_insertion_elite_ship_room_uses_duplicates() -> void:
+	var cfg := Run.session_config(Run.ROOMS[&"elite_insertion"], true)
+	check_eq(cfg["kind"], DataGen.DUPES, "reversed data would make the whole column ready at once")
+	check_eq(Run.session_config(Run.ROOMS[&"elite_insertion"], false)["kind"], DataGen.REVERSED, "classic keeps reversed")

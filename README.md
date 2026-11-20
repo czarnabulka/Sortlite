@@ -76,16 +76,29 @@ shipping each number on its own scores ×1. Q (or a right-click) ships only part
 of the run, from the exit: from a ready 3 7 8 9, ship 7 8 9 as a straight and
 keep the 3. The tension: waiting builds a bigger, prettier hand, but the run
 takes up room in the column, newcomers keep arriving, an overflow costs a
-life, and the boss swaps the sorted pair nearest the exit. Ship rooms get no
-free batch of three when the board empties, and they have their own
-arrival pace and targets (`ship_cfg` in `Run.ROOMS`).
+life, and the boss swaps the sorted pair nearest the exit. When the board
+empties, ship rooms also get a batch of three that needs sorting (a lone
+newcomer is always ready, so E alone used to score forever), but the batch
+borrows the next two arrivals, so emptying the board does not speed up the
+inflow. Ship rooms have their own arrival pace and targets (`ship_cfg` in
+`Run.ROOMS`).
+
+**Shipments are limited**, like hands in a round of Balatro: 5 to 7 per room,
+12 against the boss (`"ships"` in `ship_cfg`, shown next to the moves; the
+last one blinks red). Out of shipments below the target = the room is lost.
+Without the limit Insertion had no real decision: inserting the smallest
+number makes a whole group ready at once, so shipping everything at once was
+as good as waiting (a near-perfect player beat it by only ~26%, against ×2.5
+in Bubble). The Insertion elite of a ship room uses duplicates instead of
+reversed data, because there reversed data makes the whole column ready in
+one go.
 
 `-- --classic` brings back the old rules for comparison.
 
 ### The floor
 
 A run is one floor with 4 rooms: a Bubble fight and an Insertion fight (in
-random order), an elite on reversed data, and the boss **The Adversary**,
+random order), an elite on reversed data (duplicates for the Insertion elite in ship rooms), and the boss **The Adversary**,
 which always adds the worst possible element. Before each room you pick 1 of 3
 items (max 5, order = order of activation; with every slot full you can only
 skip). Items that work in one algorithm only (Binary Search, Express Lane)
@@ -99,7 +112,8 @@ Each room pays bits (+1 for every 5 unspent moves): 2 bits reroll the offer,
   (Insertion only), Express Lane (Bubble only).
 - `core/bots/bots.gd`: players for each algorithm (demo, sim, tests). They
   always sort perfectly; in ship rooms GREEDY ships whatever is ready at once,
-  SMART grows runs and ships the best part of them when it has to.
+  SMART grows runs and ships the best part of them when it has to (with a
+  shipment limit it waits for 5 numbers, or 3 with a pattern).
 - `ui/run_view.gd`: item choice with the floor map, end of run, transitions
   between screens (fade) and entry animations.
 - `ui/anim.gd`: easings and animation helpers.
@@ -119,9 +133,14 @@ Each room pays bits (+1 for every 5 unspent moves): 2 bits reroll the offer,
   sorted, throws in an extra number.
 - At half HP it becomes **enraged** (phase 2): new numbers and strikes come
   one move sooner.
+- **Phase shield**: until it is enraged, points stop at half its HP (a blue
+  mark on the HP bar; "SHIELD -X" shows what was lost). Hands multiply per
+  number, so with Sieve + Doubler one shipment used to one-shot it in about
+  half of the runs (two thirds with Express Lane too). Now it always takes at
+  least two hits, and the strongest builds kill it in 2–3 shipments.
 
-In a ship room with no items a smart shipper beats it in ~73% of runs and a
-greedy one in ~9%; with two items 78% and 40%.
+In a ship room with no items a smart shipper beats it in ~67% of runs and a
+greedy one in ~6%; with two items 72% and 25%.
 
 ### Items
 
@@ -142,14 +161,13 @@ makes it: the gap is what the ship decision is worth.
 
 | Room (no items) | classic | ship: greedy | ship: smart |
 |-----------------|---------|--------------|-------------|
-| Bubble fight | 88% | 11% | 91% |
-| Insertion fight | 100% | 29% | 74% |
-| Bubble elite | 93% | 6% | 91% |
-| Insertion elite | 100% | 31% | 52% |
-| Boss | 56% | 9% | 73% |
+| Bubble fight | 88% | 6% | 84% |
+| Insertion fight | 100% | 25% | 71% |
+| Bubble elite | 92% | 2% | 83% |
+| Insertion elite | 100% | 27% | 76% |
+| Boss | 52% | 6% | 67% |
 
-The Insertion elite (reversed data) still has a small gap: there the smart
-bot's simple rule is not much better than shipping at once.
+With two random items greedy reaches 11–50% and smart 76–91%.
 
 ```bash
 godot --headless --path . -s res://sim/sim_rooms.gd

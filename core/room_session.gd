@@ -8,7 +8,7 @@ extends RefCounted
 
 enum ArrivalMode { TIME, TURNS }
 
-## Classic rooms: when at most one element is left, the next arrival is a batch of three,
+## When at most one element is left, the next arrival is a batch of three,
 ## ordered by the algorithm so the newcomers still have to be sorted
 ## (a lone newcomer would always surface for free). From Bubble Sort Quest.
 const BATCH_SIZE := 3
@@ -45,6 +45,8 @@ const DEFAULTS := {
 	"enrage_at": -1,
 	## Ship room: ready numbers wait at the exit for a SHIP move (Room.manual_ship).
 	"ship": false,
+	## Ship room: shipments per room (Room.ships_left), -1 = no limit.
+	"ships": -1,
 }
 
 var room: Room
@@ -60,6 +62,8 @@ var max_lives: int
 var interval_sec: float
 var every_moves: int
 var budget_max: int
+## Shipments the room started with (-1 = no limit), for the screen.
+var ships_max := -1
 var boss: StringName
 var strike_every: int
 ## Moves left until the boss strikes; it warns when this reaches 1.
@@ -107,6 +111,12 @@ func _init(p_seed: int, p_mode: ArrivalMode, p_items: Array[Item] = [], config: 
 	room = Room.new(Algorithms.make(cfg["algorithm"]), Board.new(cfg["capacity"], values),
 			cfg["target"], budget_max, bus, true)
 	room.manual_ship = bool(cfg["ship"])
+	room.ships_left = cfg["ships"] if room.manual_ship else -1
+	# The boss's phase shield: nothing gets past half of its HP before it is
+	# enraged, so even the biggest shipment cannot one-shot it.
+	if boss != BOSS_NONE:
+		room.score_cap = enrage_at
+	ships_max = room.ships_left
 	next_value = _roll()
 
 
@@ -148,12 +158,17 @@ func deliver() -> void:
 	timer = 0.0
 	moves_since_arrival = 0
 	var batch: Array[int] = [next_value]
-	# Ship rooms need no batch: nothing leaves for free there, and a free
-	# batch for emptying the board would make shipping everything best.
-	if room.board.size() <= 1 and not room.manual_ship:
+	# Ship rooms need the batch too: a lone newcomer is always ready, so
+	# without it E alone would ship one number after another for free.
+	if room.board.size() <= 1:
 		for i in BATCH_SIZE - 1:
 			batch.append(_roll())
 		batch = room.algorithm.order_batch(batch)
+		# In a ship room the batch borrows the next arrivals: emptying the
+		# board must not bring numbers in faster (that made shipping at once best).
+		if room.manual_ship:
+			moves_since_arrival = -(batch.size() - 1) * every_moves
+			timer = -(batch.size() - 1) * interval_sec
 	var overflowed := room.arrive_batch(batch)
 	next_value = _roll()
 	if overflowed > 0:
@@ -194,6 +209,7 @@ func _boss_tick() -> void:
 		return
 	if not enraged and room.score >= enrage_at:
 		enraged = true
+		room.score_cap = -1
 		every_moves = maxi(every_moves - 1, 2)
 		strike_every = maxi(strike_every - 1, 3)
 		moves_to_strike = mini(moves_to_strike, strike_every)

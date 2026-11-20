@@ -171,6 +171,7 @@ func set_session(p_session: RoomSession, p_room_no: int, p_room_total: int, p_ki
 	bus.on(Events.BOSS_STRIKE, _on_boss_strike)
 	bus.on(Events.BOSS_DODGED, _on_boss_dodged)
 	bus.on(Events.BOSS_ENRAGED, _on_boss_enraged)
+	bus.on(Events.BOSS_SHIELD, _on_boss_shield)
 	_reset_selection()
 	_sync_visuals()
 	# The starting numbers rise into the column one after another, once the
@@ -522,6 +523,13 @@ func _on_boss_enraged(_data: Dictionary) -> void:
 	shake = 8.0
 
 
+## The phase shield stopped points: say how many, in shield blue.
+func _on_boss_shield(data: Dictionary) -> void:
+	var text := tr("BOSS_SHIELD") % int(data["blocked"])
+	var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, M).x
+	_float(text, Vector2(TANK_CX - w * 0.5, TANK_TOP + 90), Palette.CHIPS, M)
+
+
 func _on_boss_dodged(_data: Dictionary) -> void:
 	var text := tr("BOSS_DODGED")
 	var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, M).x
@@ -765,6 +773,10 @@ func _draw_left_panel() -> void:
 		_text(str(hp), Vector2(x + 8, 94), L, Palette.TEXT)
 		_text("/ %d" % room.target, Vector2(x + 8, 94), S, Palette.MUTED, right, w - 56)
 		_bar(Rect2(x + 8, 101, w - 16, 5), float(hp) / float(room.target), Palette.BAD)
+		if room.score_cap >= 0:
+			# The phase shield: points stop here until the boss is enraged.
+			var sx := x + 8 + (w - 16) * (1.0 - float(room.score_cap) / float(room.target))
+			draw_rect(Rect2(sx - 1, 97, 2, 13), Palette.CHIPS)
 	else:
 		_panel(Rect2(x, 46, w, 66))
 		_text(tr("SCORE"), Vector2(x + 8, 62), S, Palette.MUTED)
@@ -772,12 +784,18 @@ func _draw_left_panel() -> void:
 		_text("/ %d" % room.target, Vector2(x + 8, 94), M, Palette.MUTED, right, w - 16)
 		_bar(Rect2(x + 8, 101, w - 16, 5), shown_score / float(room.target), Palette.GOLD)
 
-	# Move budget
+	# Move budget, and in a ship room with a limit the shipments next to it
 	_panel(Rect2(x, 118, w, 40))
-	_text(tr("MOVES"), Vector2(x + 8, 136), S, Palette.MUTED)
-	_text("%d / %d" % [room.budget, session.budget_max], Vector2(x + 8, 137), M, Palette.TEXT, right, w - 16)
 	var low := room.budget <= 8
-	_bar(Rect2(x + 8, 146, w - 16, 4), float(room.budget) / float(session.budget_max), Palette.BAD if low else Palette.CHIPS)
+	var moves_w := w - 16
+	if session.ships_max > 0:
+		moves_w = (w - 32) / 2.0
+		_draw_ships(Rect2(x + 24 + moves_w, 118, moves_w, 40))
+		draw_line(Vector2(x + 16 + moves_w, 124), Vector2(x + 16 + moves_w, 152), Palette.PANEL_EDGE)
+	_text(tr("MOVES"), Vector2(x + 8, 136), S, Palette.MUTED)
+	_text(("%d/%d" if session.ships_max > 0 else "%d / %d") % [room.budget, session.budget_max],
+			Vector2(x + 8, 137), M, Palette.TEXT, right, moves_w)
+	_bar(Rect2(x + 8, 146, moves_w, 4), float(room.budget) / float(session.budget_max), Palette.BAD if low else Palette.CHIPS)
 
 	# Lives and bits
 	_panel(Rect2(x, 164, w, 30))
@@ -819,6 +837,26 @@ func _draw_left_panel() -> void:
 	else:
 		var hint := ("HINT_SHIP_" if is_ship() else "HINT_") + String(room.algorithm.id).to_upper()
 		draw_multiline_string(font, Vector2(x, 320), tr(hint), HORIZONTAL_ALIGNMENT_LEFT, w, S, 2, Palette.SOFT)
+
+
+## Shipments left in a ship room: a count and one square per shipment
+## (filled = still there). The last one blinks red.
+func _draw_ships(r: Rect2) -> void:
+	var left := session.room.ships_left
+	var last := left == 1 and session.is_playing()
+	var a := 0.55 + 0.45 * sin(time * 8.0) if last else 1.0
+	_text(tr("SHIPS"), Vector2(r.position.x, 136), S, Palette.MUTED)
+	_text("%d/%d" % [left, session.ships_max], Vector2(r.position.x, 137), M,
+			Color(Palette.BAD, a) if last else Palette.TEXT, HORIZONTAL_ALIGNMENT_RIGHT, r.size.x)
+	var n := session.ships_max
+	var gap := 2.0
+	var pip := floorf((r.size.x - gap * (n - 1)) / n)
+	for i in n:
+		var p := Rect2(r.position.x + i * (pip + gap), 145, pip, 6)
+		if i < left:
+			draw_rect(p, Color(Palette.BAD, a) if last else Palette.GOOD)
+		else:
+			draw_rect(p, Palette.PANEL_EDGE, false, 1.0)
 
 
 ## What E would ship now: how many, the hand's mult and its patterns.
@@ -1125,7 +1163,11 @@ func _draw_end_overlay() -> void:
 			Palette.GOLD if won else Palette.BAD, c, r.size.x)
 	var why := ""
 	if not won:
-		why = tr("OUT_OF_LIVES") if session.lives <= 0 else tr("OUT_OF_MOVES")
+		why = tr("OUT_OF_MOVES")
+		if session.lives <= 0:
+			why = tr("OUT_OF_LIVES")
+		elif room.manual_ship and room.ships_left == 0:
+			why = tr("OUT_OF_SHIPS")
 	_text(why, Vector2(r.position.x, r.position.y + 62), S, Palette.SOFT, c, r.size.x)
 	_text(tr("SCORE_OF") % [room.score, room.target], Vector2(r.position.x, r.position.y + 92), M, Palette.TEXT, c, r.size.x)
 	_text(tr("END_STATS") % [room.best_chain, room.wrong_moves, room.budget],
@@ -1162,7 +1204,7 @@ func _draw_help() -> void:
 ## algorithm appears in a run, and again with I.
 func _draw_rules() -> void:
 	draw_rect(Rect2(0, 0, 640, 360), Color(0, 0, 0, 0.72 * Anim.clamp01(overlay_t / 0.15)))
-	var r := Rect2(40, 24, 560, 312)
+	var r := Rect2(40, 10, 560, 340)
 	draw_set_transform_matrix(Anim.around(r.get_center(), Anim.pop_scale(overlay_t)))
 	_panel(r, Palette.GOLD)
 	var algo := String(session.room.algorithm.id).to_upper()
@@ -1186,16 +1228,19 @@ func _draw_rules() -> void:
 	if is_ship():
 		keys.append("RULES_SHIP_1")
 		keys.append("RULES_SHIP_2")
+		if session.ships_max > 0:
+			keys.append("RULES_SHIP_3")
 	if session.feed == RoomSession.FEED_ADVERSARY:
 		keys.append("RULES_ADVERSARY")
+	var gap := 10.0 if keys.size() < 6 else 4.0
 	for i in keys.size():
 		var color := Palette.BAD.lightened(0.2) if keys[i] == "RULES_ADVERSARY" else Palette.TEXT
 		_text("%d." % (i + 1), Vector2(x, y), S, Palette.GOLD)
 		draw_multiline_string(font, Vector2(x + 20, y), tr(keys[i]), HORIZONTAL_ALIGNMENT_LEFT, w - 20, S, 3, color)
-		var lines := mini(3, int(ceil(font.get_string_size(tr(keys[i]), HORIZONTAL_ALIGNMENT_LEFT, -1, S).x / (w - 20))))
-		y += 18.0 * maxi(lines, 1) + 10.0
+		# The real wrapped height, so the next line never overlaps (wraps differ by language).
+		y += font.get_multiline_string_size(tr(keys[i]), HORIZONTAL_ALIGNMENT_LEFT, w - 20, S, 3).y + gap
 	var blink := 0.65 + 0.35 * sin(time * 3.0)
-	_text(tr("RULES_CLOSE"), Vector2(r.position.x, r.end.y - 14), S, Color(Palette.GOLD, blink), HORIZONTAL_ALIGNMENT_CENTER, r.size.x)
+	_text(tr("RULES_CLOSE"), Vector2(r.position.x, r.end.y - 10), S, Color(Palette.GOLD, blink), HORIZONTAL_ALIGNMENT_CENTER, r.size.x)
 	draw_set_transform_matrix(Transform2D.IDENTITY)
 
 
@@ -1219,10 +1264,18 @@ func _draw_boss_intro() -> void:
 		draw_set_transform_matrix(Transform2D.IDENTITY)
 	var a := Anim.clamp01((t - 0.55) / 0.3)
 	_text(tr("BOSS_NAME_ADVERSARY"), Vector2(0, 222), M, Color(Palette.GOLD, a), c, 640)
-	draw_multiline_string(font, Vector2(120, 252), tr("BOSS_INTRO_1"), c, 400, S, 2, Color(Palette.TEXT, a))
-	draw_multiline_string(font, Vector2(120, 280), tr("BOSS_INTRO_2") % session.strike_every, c, 400, S, 2, Color(Palette.TEXT, a))
+	# One under another by their real wrapped height (wraps differ by language).
+	var y := 248.0
+	var lines: Array = [
+		[tr("BOSS_INTRO_1"), Palette.TEXT],
+		[tr("BOSS_INTRO_2") % session.strike_every, Palette.TEXT],
+		[tr("BOSS_INTRO_3"), Palette.CHIPS.lightened(0.2)],
+	]
+	for line in lines:
+		draw_multiline_string(font, Vector2(50, y), line[0], c, 540, S, 3, Color(line[1], a))
+		y += font.get_multiline_string_size(line[0], c, 540, S, 3).y + 2.0
 	var blink := 0.65 + 0.35 * sin(time * 3.0)
-	_text(tr("BOSS_FIGHT"), Vector2(0, 340), M, Color(Palette.BAD.lightened(0.2), a * blink), c, 640)
+	_text(tr("BOSS_FIGHT"), Vector2(0, 348), M, Color(Palette.BAD.lightened(0.2), a * blink), c, 640)
 
 
 func _mini_box(center: Vector2, value: int, outline := Color(0, 0, 0, 0)) -> void:
@@ -1249,7 +1302,7 @@ func _draw_rules_picture_bubble(o: Vector2) -> void:
 	draw_colored_polygon(PackedVector2Array([Vector2(ax - 4, o.y + 54), Vector2(ax + 4, o.y + 54), Vector2(ax, o.y + 47)]), Palette.GOLD)
 	draw_colored_polygon(PackedVector2Array([Vector2(ax - 4, o.y + 70), Vector2(ax + 4, o.y + 70), Vector2(ax, o.y + 77)]), Palette.GOLD)
 	_text("9 > 2", Vector2(ax + 10, o.y + 66), S, Palette.GOLD)
-	_text(tr("RULES_PIC_BUBBLE"), Vector2(o.x, o.y + 140), S, Palette.SOFT)
+	draw_multiline_string(font, Vector2(o.x, o.y + 140), tr("RULES_PIC_BUBBLE"), HORIZONTAL_ALIGNMENT_LEFT, 160, S, 2, Palette.SOFT)
 
 
 ## Insertion: the sorted top (green), the gold key pulled out, and the arrow
@@ -1269,7 +1322,7 @@ func _draw_rules_picture_insertion(o: Vector2) -> void:
 	_insert_arrow(cx + 40, cx + 30, key_y, gap_y)
 	draw_rect(Rect2(cx - 30, gap_y - 1, 60, 2), Palette.GOLD)
 	_text(tr("COST_N") % 2, Vector2(cx + 52, (key_y + gap_y) * 0.5 + 6), S, Palette.TEXT)
-	_text(tr("RULES_PIC_INSERTION"), Vector2(o.x, o.y + 164), S, Palette.SOFT)
+	draw_multiline_string(font, Vector2(o.x, o.y + 164), tr("RULES_PIC_INSERTION"), HORIZONTAL_ALIGNMENT_LEFT, 160, S, 2, Palette.SOFT)
 
 
 ## An elbow arrow from the key (at key_y) up to the gap (at gap_y).

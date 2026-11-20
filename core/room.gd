@@ -21,6 +21,16 @@ var has_arrivals: bool
 ## (a SHIP move), and the shipment scores as a hand (core/hands.gd). In
 ## classic rooms they leave by themselves as soon as they may.
 var manual_ship := false
+## Ship rooms: how many shipments are left (-1 = no limit). Like hands in a
+## round of poker: shipping every number on its own uses them up, so the
+## player has to wait for runs worth a shipment. At 0 the room is lost
+## unless the target is already met.
+var ships_left := -1
+## The score cannot go past this (-1 = no cap). A boss's phase shield: one
+## big shipment cannot skip a phase, the points over it are lost.
+var score_cap := -1
+## Points the cap stopped since the last BOSS_SHIELD event.
+var _blocked := 0
 
 var state := State.PLAYING
 var score := 0
@@ -55,7 +65,7 @@ func play(move: Dictionary) -> bool:
 	var shipping: bool = move.get("type") == Events.SHIP
 	if shipping:
 		var n: int = move.get("count", 0)
-		if not manual_ship or n < 1 or n > ready_count():
+		if not manual_ship or n < 1 or n > ready_count() or ships_left == 0:
 			return false
 	elif not algorithm.is_legal(board, move):
 		return false
@@ -134,7 +144,7 @@ func affordable_moves() -> Array[Dictionary]:
 	for m in algorithm.legal_moves(board):
 		if algorithm.move_cost(board, m) <= budget:
 			out.append(m)
-	if manual_ship and budget >= 1:
+	if manual_ship and budget >= 1 and ships_left != 0:
 		for n in range(1, ready_count() + 1):
 			out.append({"type": Events.SHIP, "count": n})
 	return out
@@ -176,6 +186,7 @@ func _resolve() -> void:
 	best_chain = maxi(best_chain, chain)
 	if chain >= 2:
 		bus.emit(Events.CHAIN, {"room": self, "length": chain})
+	_report_blocked()
 
 
 ## Sends the `count` ready elements nearest the exit out as one hand: each
@@ -186,6 +197,8 @@ func _ship(count: int) -> void:
 	for e in leaving:
 		values.append(e.value)
 	var hand := Hands.evaluate(values)
+	if ships_left > 0:
+		ships_left -= 1
 	bus.emit(Events.HAND, {"room": self, "count": count, "values": values,
 			"mult": hand["mult"], "patterns": hand["patterns"]})
 	for i in leaving.size():
@@ -194,12 +207,23 @@ func _ship(count: int) -> void:
 	best_chain = maxi(best_chain, count)
 	if count >= 2:
 		bus.emit(Events.CHAIN, {"room": self, "length": count})
+	_report_blocked()
+
+
+func _report_blocked() -> void:
+	if _blocked > 0:
+		bus.emit(Events.BOSS_SHIELD, {"room": self, "blocked": _blocked})
+		_blocked = 0
 
 
 func _score(e: Element, chain: int, mult: int) -> void:
 	var ctx := ScoreContext.new(e, chain, element_points(e), mult)
 	bus.emit(Events.SURFACE, {"room": self, "ctx": ctx})
 	var gained := ctx.total()
+	if score_cap >= 0 and score + gained > score_cap:
+		var kept := maxi(score_cap - score, 0)
+		_blocked += gained - kept
+		gained = kept
 	score += gained
 	surfaced += 1
 	bus.emit(Events.SCORED, {"room": self, "ctx": ctx, "gained": gained})
@@ -210,7 +234,7 @@ func _check_end() -> void:
 		return
 	if score >= target:
 		_finish(State.WON)
-	elif budget <= 0:
+	elif budget <= 0 or (manual_ship and ships_left == 0):
 		_finish(State.LOST)
 	elif affordable_moves().is_empty():
 		# Moves exist but none is affordable: waiting for arrivals would only

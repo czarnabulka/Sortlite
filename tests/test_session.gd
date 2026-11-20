@@ -246,3 +246,46 @@ func test_boss_enrage_score_can_be_set_apart_from_the_target() -> void:
 	t.room.board.insert_at(0, t.room.board.make(7))
 	t.play({"type": Events.SWAP, "index": 0})
 	check(t.enraged, "enraged at the given score")
+
+
+## The phase shield: one big shipment cannot take the boss past half its HP.
+func _shield_session(target: int) -> RoomSession:
+	var s := RoomSession.new(1, RoomSession.ArrivalMode.TURNS, [], {
+		"boss": RoomSession.BOSS_ADVERSARY, "ship": true, "ships": 10, "strike_every": 50,
+		"every_moves": 100, "start": 0, "target": target, "capacity": 8})
+	for v in [8, 9, 10, 11, 12]:  # bottom to top: all sorted, all ready
+		s.room.board.insert_at(s.room.board.size(), s.room.board.make(v))
+	s.bus.record_history = true
+	return s
+
+
+func test_boss_shield_stops_points_at_half_until_enraged() -> void:
+	# 8..12 shipped together: 500 points × 15 (straight) = 7500, far over 1000.
+	var s := _shield_session(1000)
+	check_eq(s.room.score_cap, 500, "the shield sits at the enrage score")
+	check(s.play({"type": Events.SHIP, "count": 5}), "ship the straight")
+	check_eq(s.room.score, 500, "capped at half")
+	check(s.is_playing(), "a single shipment cannot kill the boss")
+	check(s.enraged, "the capped shipment still enrages it")
+	check_eq(s.room.score_cap, -1, "phase 2: no shield")
+	check(s.bus.events_seen().has(Events.BOSS_SHIELD), "the screen hears about the blocked points")
+	for entry in s.bus.history:
+		if entry["event"] == Events.BOSS_SHIELD:
+			check_eq(entry["data"]["blocked"], 7000, "what the shield stopped")
+
+
+func test_boss_shield_lets_phase_two_points_through() -> void:
+	var s := _shield_session(1000)
+	s.play({"type": Events.SHIP, "count": 1})  # 12 alone: 120, under the shield
+	check_eq(s.room.score, 120, "small shipments pass")
+	s.room.score = 500
+	s.play({"type": Events.SHIP, "count": 1})  # reaches the cap, enrages
+	check(s.enraged, "enraged")
+	check(s.play({"type": Events.SHIP, "count": 3}), "phase 2 shipment")
+	check_eq(s.room.state, Room.State.WON, "points over half count in phase 2")
+
+
+func test_rooms_without_a_boss_have_no_shield() -> void:
+	for key in Run.ROOMS:
+		var s := RoomSession.new(1, RoomSession.ArrivalMode.TURNS, [], Run.session_config(Run.ROOMS[key], true))
+		check_eq(s.room.score_cap >= 0, key == &"boss_adversary", "%s shield" % key)

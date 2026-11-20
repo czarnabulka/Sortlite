@@ -36,3 +36,5 @@ const BOSS_STRIKE := &"boss_strike"
 const BOSS_DODGED := &"boss_dodged"
 ## A boss reached its second phase (half of the target scored). data: room.
 const BOSS_ENRAGED := &"boss_enraged"
+## A boss's phase shield stopped points (Room.score_cap). data: room, blocked.
+const BOSS_SHIELD := &"boss_shield"
