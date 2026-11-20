@@ -5,10 +5,13 @@ extends RefCounted
 ## into ctx.notes (the screen flashes it when that score pops); any other
 ## effect emits Events.ITEM_TRIGGERED.
 
+## Marker Median of Three leaves on a well-chosen pivot.
+const MEDIAN := &"median"
+
 const IDS: Array[StringName] = [
 	&"sieve", &"bubble_pump", &"doubler", &"warm_cache", &"parity_bit",
 	&"fibonacci_spiral", &"power_tower", &"chain_reactor", &"fuse", &"binary_search",
-	&"express_lane",
+	&"express_lane", &"spatula", &"median_of_three",
 ]
 
 
@@ -25,6 +28,8 @@ static func make(id: StringName) -> Item:
 		&"fuse": return fuse()
 		&"binary_search": return binary_search()
 		&"express_lane": return express_lane()
+		&"spatula": return spatula()
+		&"median_of_three": return median_of_three()
 	push_error("ItemCatalog: unknown id '%s'" % id)
 	return null
 
@@ -169,3 +174,59 @@ static func express_lane() -> Item:
 				carried += 1
 			if carried > 0:
 				_ping(data, &"express_lane", "FX_EXPRESS"))
+
+
+## Pancake only: every second flip that brings the biggest unsorted number
+## down onto the sorted bottom is free. (Every one of them halved Pancake's
+## cost: the strongest single item by far.)
+static func spatula() -> Item:
+	var count := [0]  # boxed, so the lambdas share it
+	var item := Item.new(&"spatula", [Events.BEFORE_MOVE, Events.FLIP]).only_for(Algorithms.PANCAKE)
+	item.react(Events.ROOM_START, func(_data: Dictionary) -> void:
+		count[0] = 0)
+	item.react(Events.BEFORE_MOVE, func(data: Dictionary) -> void:
+		var ctx: MoveContext = data["ctx"]
+		if ctx.move.get("type") != Events.FLIP or ctx.cost <= 0:
+			return
+		var room: Room = data["room"]
+		var board := room.board
+		var ready := room.ready_count()
+		if int(ctx.move["index"]) != ready or ready >= board.size():
+			return
+		var top := board.value_at(board.size() - 1)
+		for i in range(ready, board.size()):
+			if board.value_at(i) > top:
+				return
+		count[0] += 1
+		if count[0] % 2 == 0:
+			ctx.cost = 0
+			ctx.note(&"spatula", "FX_FREE"))
+	return item
+
+
+## Quick only: a pivot that was its segment's middle value (a balanced
+## split, the real Quick Sort's median-of-three trick) scores mult ×2 when it
+## leaves. (Cheaper splits did nothing: Quick rooms run out of shipments,
+## not moves.)
+static func median_of_three() -> Item:
+	var item := Item.new(&"median_of_three", [Events.BEFORE_MOVE, Events.SURFACE]).only_for(Algorithms.QUICK)
+	item.react(Events.BEFORE_MOVE, func(data: Dictionary) -> void:
+		var ctx: MoveContext = data["ctx"]
+		if ctx.move.get("type") != Events.PARTITION:
+			return
+		var room: Room = data["room"]
+		var algo := room.algorithm as QuickAlgorithm
+		var p: int = ctx.move["index"]
+		var seg := algo.segment_of(room.board, p)
+		var values: Array[int] = []
+		for i in range(seg.x, seg.y):
+			values.append(room.board.value_at(i))
+		values.sort()
+		var e := room.board.cells[p]
+		if seg.y - seg.x >= 3 and e.value == values[(values.size() - 1) / 2]:
+			e.markers[MEDIAN] = true)
+	item.react(Events.SURFACE, func(data: Dictionary) -> void:
+		var ctx: ScoreContext = data["ctx"]
+		if ctx.element.has_marker(MEDIAN):
+			ctx.apply(&"median_of_three", ScoreContext.XMULT, 2))
+	return item

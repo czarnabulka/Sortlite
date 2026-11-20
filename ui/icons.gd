@@ -22,6 +22,8 @@ const ITEMS := {
 	&"fuse": {"glyph": Vector2i(45, 9), "bg": "5a5a2a", "fg": "fff26b"},  # a bomb
 	&"binary_search": {"glyph": Vector2i(21, 21), "bg": "2f6b5a", "fg": "d6fff0"},  # up and down
 	&"express_lane": {"glyph": Vector2i(24, 12), "bg": "9a3f6b", "fg": "ffd1ea"},  # an arrow up
+	&"spatula": {"glyph": Vector2i(42, 5), "bg": "8a6a3a", "fg": "ffe8b0"},  # a shovel: the spatula
+	&"median_of_three": {"glyph": Vector2i(39, 20), "bg": "3d6b8a", "fg": "dff2ff"},  # ÷: divide and conquer
 }
 
 ## Boss id (RoomSession.BOSSES) -> its face.

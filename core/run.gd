@@ -74,7 +74,7 @@ const ROOMS := {
 	# not for an empty hand: with floor 1's targets a good build cleared most
 	# rooms with one shipment.
 	&"fight_pancake": {"kind": FIGHT, "algorithm": Algorithms.PANCAKE, "target": 1900, "budget": 32,
-			"every_moves": 2, "ship_cfg": {"every_moves": 3, "target": 8500, "ships": 7}},
+			"every_moves": 2, "ship_cfg": {"every_moves": 3, "target": 9000, "ships": 7}},
 	# Quick: a pivot costs one comparison per other number in its segment.
 	# Splits hand out long sorted runs by themselves, so with more shipments
 	# shipping at once was nearly as good as waiting: Quick rooms get 4.

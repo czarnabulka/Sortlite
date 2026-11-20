@@ -181,3 +181,7 @@ RULES_QUICK_3,A split costs 1 move per other number in the segment. A middle val
 RULES_QUICK_4,"The smallest number leaves through the exit. When the top is sorted, several leave in a chain.","Najmniejsza liczba wychodzi wyjściem. Gdy góra jest posortowana, kilka wychodzi łańcuchem."
 RULES_PIC_QUICK,Pivot 4: 2 goes above it.,Pivot 4: 2 idzie nad niego.
 PIVOT,PIVOT,PIVOT
+ITEM_SPATULA_NAME,Spatula,Łopatka
+ITEM_SPATULA_DESC,"Pancake: every second flip of the biggest number down onto the sorted bottom is free.","Pancake: co drugie zrzucenie największej liczby na gotowy dół jest darmowe."
+ITEM_MEDIAN_OF_THREE_NAME,Median of Three,Mediana z trzech
+ITEM_MEDIAN_OF_THREE_DESC,"Quick: a pivot that was its segment's middle value scores mult ×2.","Quick: pivot, który był środkową wartością odcinka, dostaje mnożnik ×2."

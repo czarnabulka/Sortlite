@@ -130,6 +130,35 @@ func test_binary_search_caps_insert_cost() -> void:
 	check_eq(room.budget, 98, "4 shifts cost only 2")
 
 
+func test_spatula_makes_every_second_flip_down_free() -> void:
+	var bus := EventBus.new()
+	ItemCatalog.spatula().attach(bus)
+	var room := pancake_room([12, 2, 9, 5, 7], 1_000_000, 100, -1, bus)
+	room.manual_ship = true
+	room.start()
+	room.play({"type": Events.FLIP, "index": 2})  # 9 to the top
+	room.play({"type": Events.FLIP, "index": 1})  # 9 down: the first flip down, paid
+	check_eq(room.budget, 98, "two flips paid")
+	room.play({"type": Events.FLIP, "index": 3})  # 12 9 | 5 7 2: 7 to the top
+	var before := room.budget
+	room.play({"type": Events.FLIP, "index": 2})  # 7 down: the second, free
+	check_eq(room.budget, before, "the second flip down was free")
+	check_eq(room.board.values().slice(0, 3), [12, 9, 7], "sorted bottom")
+
+
+func test_median_of_three_doubles_a_middle_pivots_mult() -> void:
+	var bus := EventBus.new()
+	ItemCatalog.median_of_three().attach(bus)
+	var room := quick_room([5, 8, 2, 9, 4], 1_000_000, 100, -1, bus)
+	room.manual_ship = true
+	room.start()
+	room.play({"type": Events.PARTITION, "index": 0})  # 5 is the middle of 2 4 5 8 9
+	check_eq(room.board.values(), [2, 4, 5, 8, 9], "split around 5")
+	# ships 2 4 5 (a hand of three: mult 3), 5 doubled to 6
+	room.play({"type": Events.SHIP, "count": 3})
+	check_eq(room.score, 20 * 3 + 40 * 3 + 50 * 6, "only the pivot doubled")
+
+
 func test_every_catalog_item_builds() -> void:
 	for id in ItemCatalog.IDS:
 		var item := ItemCatalog.make(id)

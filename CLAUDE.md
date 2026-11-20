@@ -109,7 +109,7 @@ only apply to this machine go in `CLAUDE.local.md`.
   effects (levels checked by ear) and icons from the 1-Bit Pack.
 - Open questions: Insertion lets a strong build clear a room with one
   shipment (about 80% on floor 1); Quick's ship decision is weaker than the
-  others' (greedy wins 20–31% with 5 items, even with 4 shipments); are the
+  others' (greedy wins 23–35% with 5 items, even with 4 shipments); are the
   Burnt Stack's sides readable to players;
   are strong builds rewarded right (after the Sieve and
   Doubler nerf, Sieve + Doubler + Bubble Pump + Power Tower scores about 3×
