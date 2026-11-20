@@ -104,8 +104,8 @@ only apply to this machine go in `CLAUDE.local.md`.
 
 ## Where things stand
 
-- Released: 0.3.3 (the game was called Roguesort before it; the repo and
-  this folder still are). Two floors (`Run.FLOORS`): Bubble and Insertion with the
+- Released: 0.3.3 (the game was called Roguesort before it; the GitHub repo
+  is now `czarnabulka/sortlite`, this folder still has the old name). Two floors (`Run.FLOORS`): Bubble and Insertion with the
   Adversary, then Pancake and Quick with the Burnt Stack, floor 2 tuned for
   a 5-item hand; 13 items (Spatula and Median of Three for the new
   algorithms) in 6 slots, a full hand replaces one; a shop after rooms 2, 4
