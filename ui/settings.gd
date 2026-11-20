@@ -52,7 +52,22 @@ static func save_arrival_mode(mode: RoomSession.ArrivalMode) -> void:
 	_save("arrival_mode", int(mode))
 
 
+## The game was called Roguesort until 0.3.3, and Godot keeps user data in a
+## folder named after the game: copy the old settings over once, so a player
+## keeps theirs.
+const OLD_DIR_NAME := "Roguesort"
+
+
+static func _migrate() -> void:
+	if FileAccess.file_exists(PATH):
+		return
+	var old := OS.get_user_data_dir().get_base_dir().path_join(OLD_DIR_NAME).path_join(PATH.get_file())
+	if FileAccess.file_exists(old):
+		DirAccess.copy_absolute(old, ProjectSettings.globalize_path(PATH))
+
+
 static func _load(key: String, default: Variant) -> Variant:
+	_migrate()
 	var cfg := ConfigFile.new()
 	if cfg.load(PATH) != OK:
 		return default
@@ -60,6 +75,7 @@ static func _load(key: String, default: Variant) -> Variant:
 
 
 static func _save(key: String, value: Variant) -> void:
+	_migrate()
 	var cfg := ConfigFile.new()
 	cfg.load(PATH)  # keep other values; a missing file is fine
 	cfg.set_value("general", key, value)

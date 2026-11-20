@@ -314,8 +314,8 @@ func _draw_title() -> void:
 	var s := 2.0
 	var drop := 10.0 * (1.0 - Anim.ease_out_cubic(page_t / 0.5))
 	draw_set_transform(Vector2(320, 88 - drop), 0.0, Vector2(s, s))
-	_text("ROGUESORT", Vector2(-160 + 1, 1), L, Color(Palette.INK, a), HORIZONTAL_ALIGNMENT_CENTER, 320)
-	_text("ROGUESORT", Vector2(-160, 0), L, Color(Palette.GOLD, a), HORIZONTAL_ALIGNMENT_CENTER, 320)
+	_text("SORTLITE", Vector2(-160 + 1, 1), L, Color(Palette.INK, a), HORIZONTAL_ALIGNMENT_CENTER, 320)
+	_text("SORTLITE", Vector2(-160, 0), L, Color(Palette.GOLD, a), HORIZONTAL_ALIGNMENT_CENTER, 320)
 	draw_set_transform_matrix(Transform2D.IDENTITY)
 	_text(tr("MENU_TAGLINE"), Vector2(0, 124), M, Color(Palette.SOFT, Anim.clamp01((page_t - 0.2) / 0.4)),
 			HORIZONTAL_ALIGNMENT_CENTER, 640)

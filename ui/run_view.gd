@@ -397,7 +397,7 @@ func _draw() -> void:
 		return
 	draw_rect(Rect2(0, 0, 640, 360), Palette.BG)
 	var head := Anim.ease_out_cubic(screen_t / 0.3)
-	_text("ROGUESORT", Vector2(16, 24), M, _a(Palette.GOLD, head))
+	_text("SORTLITE", Vector2(16, 24), M, _a(Palette.GOLD, head))
 	_text(tr("FLOOR_N") % run.floor_no(), Vector2(0, 24), M, _a(Palette.TEXT, head), HORIZONTAL_ALIGNMENT_CENTER, 640)
 	_text("seed %d" % run.seed_value, Vector2(16, 24), S, _a(Palette.MUTED, head), HORIZONTAL_ALIGNMENT_RIGHT, 608)
 	_draw_map(46)

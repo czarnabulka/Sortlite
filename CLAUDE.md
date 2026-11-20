@@ -1,4 +1,4 @@
-# Roguesort: notes for Claude
+# Sortlite: notes for Claude
 
 A puzzle roguelite about sorting, in Godot 4.7 and GDScript. The
 [README](README.md) explains the game and the folders. The design document
@@ -78,7 +78,7 @@ not the repo.
   open files with `newline=""` (or `"\n"`) when editing them from a script.
 - Player settings are saved in `user://settings.cfg` on the user's machine.
   A script that changes settings must restore the file afterwards.
-- Roguesort is its own project: no references to Bubble Sort Quest. Keep docs
+- Sortlite is its own project: no references to Bubble Sort Quest. Keep docs
   plain and current, without hype or stage history.
 - Code, comments, docs and commit messages are in English. Reply to the user
   in the language they write in (usually Polish).
@@ -90,7 +90,7 @@ not the repo.
   why; end with the co-author line the session provides.
 - A release X.Y: set `config/version` in `project.godot`, commit
   "Version X.Y: <what is new>", add an annotated tag `vX.Y`
-  ("Roguesort X.Y: <theme>"), push `main` and the tag. Releases are tags only;
+  ("Sortlite X.Y: <theme>"), push `main` and the tag. Releases are tags only;
   `gh` is not installed, so GitHub pages and the repo description are set by
   the user.
 
@@ -104,11 +104,12 @@ only apply to this machine go in `CLAUDE.local.md`.
 
 ## Where things stand
 
-- Released: 0.3.2. Two floors (`Run.FLOORS`): Bubble and Insertion with the
+- Released: 0.3.3 (the game was called Roguesort before it; the repo and
+  this folder still are). Two floors (`Run.FLOORS`): Bubble and Insertion with the
   Adversary, then Pancake and Quick with the Burnt Stack, floor 2 tuned for
   a 5-item hand; 13 items (Spatula and Median of Three for the new
   algorithms) in 6 slots, a full hand replaces one; a shop after rooms 2, 4
-  and 6; title screen, settings and pause menu; sound
+  and 6; at most 6 numbers per shipment; title screen, settings and pause menu; sound
   effects (levels checked by ear) and icons from the 1-Bit Pack.
 - Open questions: a strong build still clears floor 1 rooms with one
   shipment (76–81%, the 6-number cap cut Quick's 43% to 14–19% but not
