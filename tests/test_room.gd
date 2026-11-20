@@ -43,12 +43,14 @@ func test_events_fire_in_order() -> void:
 func test_bus_depth_limit_stops_loops() -> void:
 	var bus := EventBus.new()
 	var calls := [0]
-	bus.on(&"ping", func(_d: Dictionary) -> void:
+	var loop := func(_d: Dictionary) -> void:
 		calls[0] += 1
-		bus.emit(&"ping"))
+		bus.emit(&"ping")
+	bus.on(&"ping", loop)
 	bus.emit(&"ping")
 	check_eq(calls[0], EventBus.MAX_DEPTH, "loop cut at max depth")
 	check_eq(bus.dropped, 1, "one event dropped")
+	bus.off(&"ping", loop)  # the handler holds the bus: a cycle until removed
 
 
 func test_same_seed_same_data() -> void:

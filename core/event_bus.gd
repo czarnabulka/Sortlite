@@ -37,12 +37,21 @@ func emit(event: StringName, data: Dictionary = {}) -> bool:
 		dropped += 1
 		return false
 	_depth += 1
+	# Appended before the handlers run, so nested events come after this one.
+	var entry := {"event": event, "data": data}
 	if record_history:
-		history.append({"event": event, "data": data})
+		history.append(entry)
 	# Copy, so a handler that detaches itself does not skip the next one.
 	for handler: Callable in _handlers.get(event, []).duplicate():
 		if handler.is_valid():
 			handler.call(data)
+	# The room owns this bus: a "room" kept in the history would be a
+	# reference cycle that is never freed. Copied after the handlers, so the
+	# entry shows what they changed (an absorbed overflow).
+	if record_history and data.has("room"):
+		var kept := data.duplicate()
+		kept.erase("room")
+		entry["data"] = kept
 	_depth -= 1
 	return true
 
