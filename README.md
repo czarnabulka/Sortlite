@@ -5,7 +5,7 @@ real sorting algorithms, then choose when the sorted ones leave: a shipment
 scores like a poker hand, and the items you pick between rooms build on each
 other.
 
-Version 0.3.4 · Godot 4.7, GDScript · English and Polish ·
+Version 0.4 · Godot 4.7, GDScript · English and Polish ·
 [design document](https://claude.ai/artifact/5ETaojyCo7PVF7KUTtAXea)
 
 ## Run it

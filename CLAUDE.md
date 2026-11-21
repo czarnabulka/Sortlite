@@ -109,9 +109,9 @@ only apply to this machine go in `CLAUDE.local.md`.
 
 ## Where things stand
 
-- Released: 0.3.4 (the game was called Roguesort before it; the GitHub repo
+- Released: 0.4 (the game was called Roguesort before 0.3.3; the GitHub repo
   is now `czarnabulka/sortlite`, this folder still has the old name).
-- Not released yet: a third floor. Three floors (`Run.FLOORS`): Bubble and
+  Three floors (`Run.FLOORS`): Bubble and
   Insertion with the Adversary; Pancake and Quick with the Burnt Stack
   (tuned for a 5-item hand); Merge and Heap with the Memory Leak (6 items).
   17 items (Galloping, Sift Down, Tail Call, Off-by-One are new) in 6 slots,
