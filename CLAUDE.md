@@ -100,9 +100,11 @@ not the repo.
   why; end with the co-author line the session provides.
 - A release X.Y: set `config/version` in `project.godot`, commit
   "Version X.Y: <what is new>", add an annotated tag `vX.Y`
-  ("Sortlite X.Y: <theme>"), push `main` and the tag. Releases are tags only;
-  `gh` is not installed, so GitHub pages and the repo description are set by
-  the user.
+  ("Sortlite X.Y: <theme>"), push `main` and the tag, then publish a GitHub
+  Release for the tag (title "Sortlite X.Y", notes in English: what is in
+  the game, what is new). `gh` is not installed: make the Release in the
+  built-in browser at `github.com/czarnabulka/sortlite/releases/new?tag=vX.Y`
+  (the user signs in there). The repo description is set by the user.
 
 ## Keeping this file current
 
