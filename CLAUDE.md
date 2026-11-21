@@ -23,6 +23,11 @@ $GODOT --headless --path . -s res://sim/sim_rooms.gd -- --ship --build sieve,dou
 $GODOT --path . -s res://tools/shot.gd -- --screen room --room 1 --lang pl --out <png>   # screenshot (opens a window)
 ```
 
+Builds: `export_presets.cfg` has "Windows Desktop" (one `.exe`, game embedded)
+and "Web" (no threads, so it runs on itch.io without special headers); they
+need Godot's export templates for 4.7.2 and write to `build/` (ignored):
+`$GODOT --headless --path . --export-release "Windows Desktop" build/windows/Sortlite.exe`.
+
 `tools/shot.gd` lists its options at the top (title, settings, pause, rules
 and boss cards). Write PNGs and scratch scripts to the session's scratchpad,
 not the repo.
@@ -109,7 +114,7 @@ only apply to this machine go in `CLAUDE.local.md`.
 
 ## Where things stand
 
-- Released: 0.4 (the game was called Roguesort before 0.3.3; the GitHub repo
+- Released: 1.0 (the game was called Roguesort before 0.3.3; the GitHub repo
   is now `czarnabulka/sortlite`, this folder still has the old name).
   Three floors (`Run.FLOORS`): Bubble and
   Insertion with the Adversary; Pancake and Quick with the Burnt Stack
@@ -126,7 +131,7 @@ only apply to this machine go in `CLAUDE.local.md`.
   hands out a long ready run at once; Heap is the opposite (greedy never
   wins: it pops one number at a time); a whole run is long now (the
   first-offer bot wins 7 of 100); are the Burnt Stack's sides readable to
-  players; is the Heap tree (lines beside the column) readable;
+  players; is the Heap tree (drawn as a tree, red lines to lift) readable;
   are strong builds rewarded right (after the Sieve and
   Doubler nerf, Sieve + Doubler + Bubble Pump + Power Tower scores about 3×
   a room's target, was 5×);

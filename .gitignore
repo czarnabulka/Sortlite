@@ -8,3 +8,6 @@ Thumbs.db
 
 # Claude Code: machine-specific notes
 CLAUDE.local.md
+
+# Exported builds (export_presets.cfg)
+build/

@@ -5,7 +5,7 @@ real sorting algorithms, then choose when the sorted ones leave: a shipment
 scores like a poker hand, and the items you pick between rooms build on each
 other.
 
-Version 0.4 · Godot 4.7, GDScript · English and Polish ·
+Version 1.0 · Godot 4.7, GDScript · English and Polish ·
 [design document](https://claude.ai/artifact/5ETaojyCo7PVF7KUTtAXea)
 
 ## Run it
@@ -15,6 +15,18 @@ Open the folder in Godot and press F5, or:
 ```bash
 godot --path .
 ```
+
+To build a game others can download (`build/`, not in git), install Godot's
+export templates once (Editor → Manage Export Templates → Download and
+Install), then:
+
+```bash
+godot --headless --path . --export-release "Windows Desktop" build/windows/Sortlite.exe
+godot --headless --path . --export-release "Web" build/web/index.html
+```
+
+The Windows build is one `.exe` with the game inside. The Web build runs in a
+browser (itch.io: zip the `build/web` folder, upload it as HTML).
 
 The game opens on the title screen: new run, a demo where the bot plays,
 settings (language, sound volume, CRT effect, fullscreen, arrivals by moves
@@ -48,9 +60,9 @@ three start a run at once. `--lang pl` picks the language for one launch, and
   **Merge**: stretches that already go up are runs; merge a run with the
   next one (1 move per number in both, less one); the smallest number is
   ready at the exit.
-  **Heap**: the column under the ready run is a binary tree with its root at
-  the bottom; lift a number over its parent (1 move) or pop the root (1
-  move): when it is the tree's biggest it joins the ready run at the top.
+  **Heap**: the numbers form a binary tree, root on top; a red line marks a
+  child bigger than its parent: lift it (1 move). With no red line left, pop
+  the root (1 move) into the tray at the exit, where it is ready.
 - Ready numbers wait at the exit. **E** ships them as one hand (1 move, up
   to 6 numbers), **Q** ships fewer. Each number scores `value × 10 × mult`; the mult is the
   hand's length plus a bonus per number for each pattern:
@@ -69,16 +81,16 @@ three start a run at once. `--lang pl` picks the language for one launch, and
   score half and swaps a sorted pair every few moves (move it to dodge). The
   Burnt Stack gives every number a burnt side that a flip turns over (burnt
   side up scores half) and scorches the clean number nearest the exit (move or
-  ship it to dodge). The Memory Leak takes the top cell of the column every
-  few moves, with any number in it (keep a cell free to dodge); a shipment of
-  3 or more wins a cell back. All get faster at half HP, and a shield stops
+  ship it to dodge). The Memory Leak takes a memory cell every few moves,
+  and with full memory the tree's last leaf too (keep a cell free to dodge);
+  a shipment of 3 or more wins a cell back. All get faster at half HP, and a shield stops
   any single shipment from taking more than half their HP.
 
 ## Controls
 
 | Key | Action |
 |-----|--------|
-| W / S, arrows, mouse wheel | pick a pair (Bubble), a place for the key (Insertion), where the spatula goes (Pancake), a pivot (Quick), a run (Merge) or a number (Heap; the root pops) |
+| W / S, arrows, mouse wheel | pick a pair (Bubble), a place for the key (Insertion), where the spatula goes (Pancake), a pivot (Quick), a run (Merge) or a red line (Heap; the root once there is none) |
 | SPACE, click | swap / insert / flip / split / merge / lift or pop |
 | E | ship the ready numbers |
 | Q / right-click | ship fewer / ship up to the clicked number |
