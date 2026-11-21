@@ -196,26 +196,26 @@ ALGO_MERGE,Merge Sort,Merge Sort
 ALGO_HEAP,Heap Sort,Heap Sort
 HINT_MERGE,Merge neighbouring runs. The smallest leaves.,Scalaj sąsiednie serie. Najmniejsza wychodzi.
 HINT_SHIP_MERGE,Merge neighbouring runs. E ships the ready ones.,Scalaj sąsiednie serie. E wysyła gotowe.
-HINT_HEAP,"Lift big numbers, pop the root. Popped ones leave.","Podnoś duże, zdejmuj korzeń. Zdjęte wychodzą."
-HINT_SHIP_HEAP,"Lift big numbers, pop the root. E ships the ready ones.","Podnoś duże, zdejmuj korzeń. E wysyła gotowe."
+HINT_HEAP,"Lift along red lines; with none, pop the root.","Podnoś po czerwonych liniach, a bez nich zdejmij korzeń."
+HINT_SHIP_HEAP,"Lift along red lines, pop the root. E ships the tray.","Podnoś po czerwonych, zdejmuj korzeń. E wysyła tacę."
 RULES_MERGE_1,Stretches that already go up form runs (the brackets). Pick a run and press SPACE to merge it with the next one.,"Odcinki, które już rosną, tworzą serie (nawiasy). Wybierz serię i wciśnij SPACJĘ, żeby scalić ją z następną."
 RULES_MERGE_2,"The two runs become one sorted run. It costs 1 move per number in them, less one.","Obie serie stają się jedną posortowaną. Kosztuje to 1 ruch za każdą ich liczbę, minus jeden."
 RULES_MERGE_3,Two short runs are cheap to merge; feeding a long run one number at a time is not.,"Dwie krótkie serie scala się tanio, dokładanie do długiej po jednej liczbie już nie."
 RULES_MERGE_4,"The smallest number leaves through the exit. When the top is sorted, several leave in a chain.","Najmniejsza liczba wychodzi wyjściem. Gdy góra jest posortowana, kilka wychodzi łańcuchem."
-RULES_HEAP_1,"Below the ready ones the column is a tree: each number hangs under a parent (the lines), the root is at the bottom.","Pod gotowymi kolumna jest drzewem: każda liczba wisi pod rodzicem (linie), korzeń jest na dole."
-RULES_HEAP_2,"SPACE swaps a number with its parent, the one its line leads to (1 move). Lift only a child bigger than its parent and its sibling.","SPACJA zamienia liczbę z rodzicem, do którego prowadzi jej linia (1 ruch). Podnoś tylko dziecko większe od rodzica i rodzeństwa."
-RULES_HEAP_3,SPACE on the root at the bottom pops it to the ready ones (1 move). Pop only the biggest.,SPACJA na korzeniu na dole zdejmuje go do gotowych (1 ruch). Zdejmuj tylko największą.
-RULES_HEAP_4,"Popped numbers wait at the exit at the top, in the order they were popped. A newcomer joins the tree below them.","Zdjęte czekają przy wyjściu na górze, w kolejności zdejmowania. Nowa liczba dołącza do drzewa pod nimi."
+RULES_HEAP_1,The numbers form a tree with the root on top: each hangs under its parent. Popped ones wait in the tray at the exit.,Liczby tworzą drzewo z korzeniem na górze: każda wisi pod rodzicem. Zdjęte czekają w tacy przy wyjściu.
+RULES_HEAP_2,A red line: a child bigger than its parent (a heap has none). SPACE on the child swaps the two (1 move).,Czerwona linia: dziecko większe od rodzica (kopiec takich nie ma). SPACJA na dziecku zamienia je (1 ruch).
+RULES_HEAP_3,No red line left: the root is the biggest. SPACE on the root pops it into the tray (1 move).,Bez czerwonych linii korzeń jest największy. SPACJA na korzeniu zdejmuje go do tacy (1 ruch).
+RULES_HEAP_4,Popped numbers leave in the order they were popped. A newcomer joins the tree as its last leaf.,Zdjęte wychodzą w kolejności zdejmowania. Nowa liczba dołącza do drzewa jako ostatni liść.
 RULES_PIC_MERGE,"Two runs, one merge: 3 moves.","Dwie serie, jedno scalenie: 3 ruchy."
-RULES_PIC_HEAP,9 is over 4 and 7: a heap. Pop the 9.,9 jest nad 4 i 7: kopiec. Zdejmij 9.
+RULES_PIC_HEAP,No red line: 9 is the biggest. Pop it.,Brak czerwonych linii: 9 jest największa. Zdejmij ją.
 WRONG_SIFT,WRONG LIFT,ZŁE PODNIESIENIE
 WRONG_POP,WRONG POP,ZŁE ZDJĘCIE
 BOSS_NAME_LEAK,THE MEMORY LEAK,WYCIEK PAMIĘCI
 BOSS_HP_LEAK,MEMORY LEAK HP,HP WYCIEKU PAMIĘCI
 BOSS_STRIKES_IN_LEAK,Moves until the leak takes a cell: %d,Ruchy do utraty komórki: %d
-RULES_LEAK,"BOSS: every few moves the top cell is lost for good, with any number in it. A shipment of 3+ wins a cell back.","BOSS: co kilka ruchów górna komórka znika na dobre, razem z liczbą w niej. Wysyłka 3+ odzyskuje komórkę."
-BOSS_INTRO_LEAK_1,It eats memory: the column loses cells. A number in a lost cell is gone and costs a life.,Zjada pamięć: kolumna traci komórki. Liczba w utraconej komórce przepada i kosztuje życie.
-BOSS_INTRO_LEAK_2,Every %d moves it takes the top cell (keep one free to save the number). A shipment of 3 or more wins one back.,"Co %d ruchy zabiera górną komórkę (zostaw jedną wolną, żeby ocalić liczbę). Wysyłka 3 lub więcej odzyskuje jedną."
+RULES_LEAK,"BOSS: every few moves a memory cell is lost for good, and with full memory the tree's last leaf too. A shipment of 3+ wins a cell back.","BOSS: co kilka ruchów znika na dobre komórka pamięci, a przy pełnej pamięci także ostatni liść. Wysyłka 3+ odzyskuje komórkę."
+BOSS_INTRO_LEAK_1,"It eats memory: cells are lost for good. When memory is full, the tree's last leaf goes with the cell and costs a life.",Zjada pamięć: komórki znikają na dobre. Przy pełnej pamięci razem z komórką przepada ostatni liść drzewa i kosztuje życie.
+BOSS_INTRO_LEAK_2,Every %d moves it takes a cell (keep one free to save the leaf). A shipment of 3 or more wins one back.,"Co %d ruchy zabiera komórkę (zostaw jedną wolną, żeby ocalić liść). Wysyłka 3 lub więcej odzyskuje jedną."
 MEMORY_FREED,+1 CELL,+1 KOMÓRKA
 FX_SIFT,sifted!,przesiane!
 FX_STRAIGHT,straight!,strit!
@@ -229,9 +229,11 @@ ITEM_OFF_BY_ONE_NAME,Off-by-One,Błąd o jeden
 ITEM_OFF_BY_ONE_DESC,A shipment of 3+ with one value missing (4 5 7) counts as a straight.,Wysyłka 3+ z jedną brakującą wartością (4 5 7) liczy się jako strit.
 MERGE_LABEL,MERGE,SCAL
 HEAP_POP,POP,ZDEJMIJ
-HEAP_LIFT,LIFT,PODNIEŚ
 BOSS_LEAK_HIT,-1 CELL,-1 KOMÓRKA
 EVERY_N_MOVES_MANY,every %d moves,co %d ruchów
 BOSS_INTRO_ADVERSARY_2_MANY,Every %d moves it strikes: it swaps a sorted pair (move it first to dodge) or throws in a number. At half HP it gets angry.,"Co %d ruchów atakuje: zamienia posortowaną parę (rusz ją pierwszy, żeby zrobić unik) albo wrzuca liczbę. Przy połowie HP wpada we wściekłość."
 BOSS_INTRO_BURNT_2_MANY,Every %d moves it scorches the clean number nearest the exit (move or ship it first to dodge). At half HP it sends burnt numbers.,"Co %d ruchów przypala czystą liczbę najbliżej wyjścia (rusz ją albo wyślij, żeby zrobić unik). Od połowy HP przysyła przypalone liczby."
-BOSS_INTRO_LEAK_2_MANY,Every %d moves it takes the top cell (keep one free to save the number). A shipment of 3 or more wins one back.,"Co %d ruchów zabiera górną komórkę (zostaw jedną wolną, żeby ocalić liczbę). Wysyłka 3 lub więcej odzyskuje jedną."
+BOSS_INTRO_LEAK_2_MANY,Every %d moves it takes a cell (keep one free to save the leaf). A shipment of 3 or more wins one back.,"Co %d ruchów zabiera komórkę (zostaw jedną wolną, żeby ocalić liść). Wysyłka 3 lub więcej odzyskuje jedną."
+HEAP_FIX,Lift along the red lines,Podnoś po czerwonych liniach
+HEAP_READY,A heap: pop the root,Kopiec gotowy: zdejmij korzeń
+MEMORY,MEMORY,PAMIĘĆ

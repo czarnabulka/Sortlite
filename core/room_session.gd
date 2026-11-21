@@ -342,7 +342,8 @@ func _scorch() -> void:
 
 
 ## The Memory Leak takes the top cell. A number still in it (the column is
-## full) is lost: the tree's last leaf, never the ready run.
+## full) is lost: the tree's last leaf, or, with every number popped, the
+## popped one that would ship last.
 func _leak() -> void:
 	strike_uids.clear()
 	strike_index = -1
@@ -364,7 +365,8 @@ func _leak() -> void:
 	room.refresh()
 
 
-## Index of the number the next leak would take, or -1 while a cell is free.
+## Index of the number the next leak would take, or -1 while a cell is free:
+## the cell just under where newcomers arrive (the tree's last leaf).
 func leak_victim() -> int:
 	var board := room.board
 	if board.size() < board.capacity or board.is_empty():

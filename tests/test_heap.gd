@@ -187,3 +187,11 @@ func test_long_shipment_frees_a_leaked_cell() -> void:
 	s.bus.emit(Events.HAND, {"room": s.room, "count": 3, "values": [1, 2, 3], "mult": 3, "patterns": []})
 	check_eq(s.room.board.capacity, 7, "three free a cell")
 	check(bus_saw[0], "the screen hears it")
+
+
+func test_memory_leak_with_every_number_popped_takes_the_last_to_ship() -> void:
+	var s := _leak_session(4, 4)
+	var b := s.room.board
+	for e in b.cells:
+		e.markers[Element.POPPED] = true
+	check_eq(s.leak_victim(), 0, "no tree: the popped number that ships last")
