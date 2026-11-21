@@ -23,8 +23,8 @@ $GODOT --headless --path . -s res://sim/sim_rooms.gd -- --ship --build sieve,dou
 $GODOT --path . -s res://tools/shot.gd -- --screen room --room 1 --lang pl --out <png>   # screenshot (opens a window)
 ```
 
-Builds: `export_presets.cfg` has "Windows Desktop" (one `.exe`, game embedded)
-and "Web" (no threads, so it runs on itch.io without special headers); they
+Builds: `export_presets.cfg` has "Windows Desktop" (one `.exe`, game embedded),
+"Linux" (one `Sortlite.x86_64`, game embedded) and "Web" (no threads, so it runs on itch.io without special headers); they
 need Godot's export templates for 4.7.2 and write to `build/` (ignored):
 `$GODOT --headless --path . --export-release "Windows Desktop" build/windows/Sortlite.exe`.
 

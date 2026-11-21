@@ -22,11 +22,13 @@ Install), then:
 
 ```bash
 godot --headless --path . --export-release "Windows Desktop" build/windows/Sortlite.exe
+godot --headless --path . --export-release "Linux" build/linux/Sortlite.x86_64
 godot --headless --path . --export-release "Web" build/web/index.html
 ```
 
-The Windows build is one `.exe` with the game inside. The Web build runs in a
-browser (itch.io: zip the `build/web` folder, upload it as HTML).
+The Windows and Linux builds are one file each with the game inside (on
+Linux, make it executable: `chmod +x Sortlite.x86_64`). The Web build runs
+in a browser (itch.io: zip the `build/web` folder, upload it as HTML).
 
 The game opens on the title screen: new run, a demo where the bot plays,
 settings (language, sound volume, CRT effect, fullscreen, arrivals by moves
