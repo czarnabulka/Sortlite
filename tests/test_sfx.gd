@@ -9,7 +9,7 @@ func test_every_sound_file_loads() -> void:
 		check(row.size() == 3 or row.size() == 4, "%s: [files, dB, spread, gap?]" % name)
 		check(not (row[0] as Array).is_empty(), "%s: at least one file" % name)
 		for file: String in row[0]:
-			var stream := load(Sfx.DIR + file + ".ogg") as AudioStream
+			var stream := load(Sfx.DIR + file) as AudioStream
 			check(stream != null, "%s: %s loads" % [name, file])
 			if stream != null:
 				check(stream.get_length() > 0.0 and stream.get_length() < 2.0, "%s: %s is a short sound" % [name, file])
@@ -22,9 +22,10 @@ func test_no_unused_sound_files() -> void:
 	for row: Array in Sfx.SOUNDS.values():
 		for file: String in row[0]:
 			used[file] = true
-	for f in DirAccess.get_files_at(Sfx.DIR):
-		if f.ends_with(".ogg"):
-			check(used.has(f.get_basename()), "%s is not used in Sfx.SOUNDS" % f)
+	for sub in ["synth", "kenney"]:
+		for f in DirAccess.get_files_at(Sfx.DIR + sub):
+			if f.ends_with(".ogg") or f.ends_with(".wav"):
+				check(used.has(sub + "/" + f), "%s/%s is not used in Sfx.SOUNDS" % [sub, f])
 
 
 func test_sounds_used_in_code_exist() -> void:
@@ -44,25 +45,39 @@ func test_sounds_used_in_code_exist() -> void:
 				check(Sfx.SOUNDS.has(StringName(m.get_string(1))), "room_view uses unknown sound %s" % m.get_string(1))
 
 
-func test_score_notes_climb_a_fifth() -> void:
+func test_score_notes_climb_the_pentatonic() -> void:
 	check_eq(Sfx.score_pitch(1), 1.0, "first number at the base pitch")
-	check(Sfx.score_pitch(2) > Sfx.score_pitch(1), "each next number higher")
-	check(is_equal_approx(Sfx.score_pitch(8), pow(2.0, 7.0 / 12.0)), "a fifth at the 8th")
-	check_eq(Sfx.score_pitch(20), Sfx.score_pitch(8), "never past a fifth")
+	for i in range(2, 7):
+		check(Sfx.score_pitch(i) > Sfx.score_pitch(i - 1), "number %d higher than the one before" % i)
+	check(is_equal_approx(Sfx.score_pitch(3), pow(2.0, 4.0 / 12.0)), "a major third at the 3rd")
+	check(is_equal_approx(Sfx.score_pitch(6), 2.0), "an octave at the 6th")
+	check_eq(Sfx.score_pitch(20), Sfx.score_pitch(6), "never past an octave")
 
 
 ## Played loudness (the file's RMS + the row's dB) stays under -24 dB for the
-## loudest files, so no sound jumps out. File RMS measured once, in dB.
+## loudest files, so no sound jumps out. File RMS measured once, in dB
+## (tools/make_sfx.gd prints it for the synthesized ones).
 func test_no_sound_is_much_louder_than_the_rest() -> void:
-	var rms := {"confirmation_001": -11.3, "maximize_009": -10.6, "minimize_009": -10.6, "lowDown": -10.1,
-			"lowThreeTone": -10.9, "toggle_002": -12.2, "select_007": -13.6, "jingles_NES03": -13.8,
-			"jingles_NES11": -13.7, "jingles_NES12": -13.7, "powerUp7": -14.8, "phaseJump2": -14.4,
-			"jingles_NES09": -15.7, "jingles_NES10": -15.3, "jingles_NES15": -15.4, "back_002": -15.8,
-			"error_004": -16.3, "impactPunch_medium_000": -17.2, "tone1": -17.2, "tick_002": -17.2,
-			"impactPunch_heavy_000": -18.0}
+	var rms := {
+		"kenney/jingles_NES03.ogg": -13.8, "kenney/jingles_NES09.ogg": -15.7,
+		"kenney/jingles_NES10.ogg": -15.3, "kenney/jingles_NES11.ogg": -13.7,
+		"kenney/jingles_NES12.ogg": -13.7, "kenney/jingles_NES15.ogg": -15.4,
+		"synth/arrive.wav": -13.7, "synth/back.wav": -11.1, "synth/boss_aim.wav": -8.1,
+		"synth/boss_dodged.wav": -12.4, "synth/boss_enraged.wav": -12.5,
+		"synth/boss_intro.wav": -11.0, "synth/boss_strike.wav": -14.4,
+		"synth/card_close.wav": -12.6, "synth/card_hover.wav": -12.4, "synth/card_open.wav": -12.4,
+		"synth/chips.wav": -16.6, "synth/combo_big.wav": -14.2, "synth/combo_mid.wav": -11.5,
+		"synth/combo_small.wav": -11.2, "synth/confirm.wav": -11.2, "synth/cursor.wav": -12.6,
+		"synth/deal.wav": -13.5, "synth/flip.wav": -13.4, "synth/heal.wav": -11.3,
+		"synth/insert.wav": -13.5, "synth/item.wav": -11.7, "synth/overflow.wav": -15.1,
+		"synth/partition.wav": -10.9, "synth/pattern.wav": -11.2, "synth/ready.wav": -13.4,
+		"synth/score.wav": -12.4, "synth/shield.wav": -15.4, "synth/ship.wav": -9.2,
+		"synth/skip.wav": -11.6, "synth/swap.wav": -10.9, "synth/take.wav": -11.0,
+		"synth/toggle.wav": -12.6, "synth/wrong.wav": -5.3}
 	for name: StringName in Sfx.SOUNDS:
 		var row: Array = Sfx.SOUNDS[name]
 		for file: String in row[0]:
+			check(rms.has(file), "%s: RMS of %s listed here" % [name, file])
 			if rms.has(file):
 				var played := float(rms[file]) + float(row[1])
 				check(played <= -24.0, "%s (%s) plays at %.1f dB RMS, over -24" % [name, file, played])

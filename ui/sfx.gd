@@ -5,82 +5,84 @@ extends Node
 ## does nothing.
 ##
 ## Every sound is in the SOUNDS table: the files (one is picked at random) and
-## a volume. To change a sound, change its row; the files are Kenney's CC0
-## packs (assets/sounds/kenney, see CREDITS.md).
+## a volume. The effects are synthesized by tools/make_sfx.gd into
+## assets/sounds/synth (one soft chiptune family in C major, change a sound
+## there and run it again); the 8-bit jingles are Kenney's CC0 Music Jingles
+## (assets/sounds/kenney, see CREDITS.md).
 ##
 ## Levels: the volumes put each sound at a measured loudness (the file's RMS
 ## plus the row's dB): about -30 dB for what plays all the time (moves,
 ## scores), -26 to -28 for events, -24 to -25 for the boss and the end of a
 ## room. A limiter on the Master bus keeps stacked sounds from clipping.
 
-const DIR := "res://assets/sounds/kenney/"
+const DIR := "res://assets/sounds/"
 const PLAYERS := 10
 ## The same sound again within this many seconds is skipped (a batch of
 ## arrivals, several items at once), so sounds don't stack into noise.
 const MIN_GAP := 0.045
 ## Random pitch spread for sounds heard often, so repeats don't grate.
 const SPREAD := 0.04
-## How high the score notes climb, in semitones (a fifth): bright plucks an
-## octave up got shrill.
-const SCORE_STEPS := 7
+## The score notes climb the C major pentatonic, in semitones, up to an
+## octave: every note fits the chord that ends the shipment.
+const SCORE_STEPS: Array[int] = [0, 2, 4, 7, 9, 12]
 ## The Master limiter's ceiling, in dB.
 const CEILING_DB := -3.0
 
-## name -> [files, volume in dB, spread pitch?, optional: seconds before it
-## may play again]
+## name -> [files (under DIR), volume in dB, spread pitch?, optional: seconds
+## before it may play again]
 const SOUNDS := {
 	# Menus and cards
-	&"cursor": [["tick_002"], -13.0, true],
-	&"confirm": [["confirmation_001"], -15.0, false],
-	&"back": [["back_002"], -12.0, false],
-	&"toggle": [["toggle_002"], -16.0, false],
-	&"card_open": [["maximize_009"], -18.0, false],
-	&"card_close": [["minimize_009"], -18.0, false],
+	&"cursor": [["synth/cursor.wav"], -17.5, true],
+	&"confirm": [["synth/confirm.wav"], -16.0, false],
+	&"back": [["synth/back.wav"], -16.0, false],
+	&"toggle": [["synth/toggle.wav"], -14.5, false],
+	&"card_open": [["synth/card_open.wav"], -14.5, false],
+	&"card_close": [["synth/card_close.wav"], -14.5, false],
 	# Moves
-	&"swap": [["impactWood_light_000", "impactWood_light_001", "impactWood_light_002", "impactWood_light_003"], -8.0, true],
-	&"insert": [["impactPlate_light_000"], -5.0, true],
-	&"flip": [["card-slide-5"], -2.0, true],
-	&"partition": [["card-fan-1"], -6.0, true],
-	&"wrong": [["error_004"], -12.0, false],
-	&"arrive": [["drop_003"], -12.0, true],
-	&"ship": [["select_007"], -13.0, false],
-	# Scoring: one pluck per number, a step higher each time (see score_pitch);
-	# from the 4th number on, chips pile up under it, and the last number of a
-	# shipment lands with a bigger handful the longer the shipment was.
-	&"score": [["pluck_001"], -10.0, false],
-	&"chips": [["chips-stack-1", "chips-stack-2", "chips-stack-4", "chips-stack-5", "chips-stack-6"], -10.0, true],
-	&"combo_small": [["chips-handle-3"], -8.0, false],
-	&"combo_mid": [["chips-handle-1"], -6.0, false],
-	&"combo_big": [["chips-handle-5"], -4.0, false],
-	&"combo_fanfare": [["jingles_NES09"], -12.0, false],
-	&"item": [["glass_006"], -12.0, true],
-	&"pattern": [["powerUp7"], -13.0, false],
+	&"swap": [["synth/swap.wav"], -19.0, true],
+	&"insert": [["synth/insert.wav"], -16.5, true],
+	&"flip": [["synth/flip.wav"], -16.5, true],
+	&"partition": [["synth/partition.wav"], -19.0, true],
+	&"wrong": [["synth/wrong.wav"], -21.5, false],
+	&"arrive": [["synth/arrive.wav"], -16.5, true],
+	&"ship": [["synth/ship.wav"], -18.0, false],
+	# Scoring: one note per number, a step up the pentatonic each time (see
+	# score_pitch); from the 4th number on, a coin tink under it, and the last
+	# number of a shipment lands with a bigger chord the longer it was.
+	&"score": [["synth/score.wav"], -17.5, false],
+	&"chips": [["synth/chips.wav"], -13.5, true],
+	&"combo_small": [["synth/combo_small.wav"], -16.0, false],
+	&"combo_mid": [["synth/combo_mid.wav"], -15.5, false],
+	&"combo_big": [["synth/combo_big.wav"], -10.5, false],
+	&"combo_fanfare": [["kenney/jingles_NES09.ogg"], -12.0, false],
+	&"item": [["synth/item.wav"], -18.5, true],
+	&"pattern": [["synth/pattern.wav"], -16.0, false],
 	# A number joins the ready run at the exit (pitch rises with the run).
-	&"ready": [["chip-lay-1"], -12.0, false],
+	&"ready": [["synth/ready.wav"], -16.5, false],
 	# Trouble
-	&"overflow": [["impactPunch_medium_000"], -8.0, false],
+	&"overflow": [["synth/overflow.wav"], -12.0, false],
 	# Last shipment, or few moves left.
-	&"warning": [["jingles_NES15"], -14.0, false, 6.0],
+	&"warning": [["kenney/jingles_NES15.ogg"], -14.0, false, 6.0],
 	# The column is one number from full: it can flicker around that line,
 	# so at most once every few seconds.
-	&"danger": [["jingles_NES10"], -15.0, false, 8.0],
+	&"danger": [["kenney/jingles_NES10.ogg"], -15.0, false, 8.0],
 	# Boss
-	&"boss_intro": [["lowThreeTone"], -14.0, false],
-	&"boss_aim": [["tone1"], -12.0, false],
-	&"boss_strike": [["impactPunch_heavy_000"], -7.0, false],
-	&"boss_dodged": [["phaseJump2"], -14.0, false],
-	&"boss_enraged": [["lowDown"], -14.0, false],
-	&"shield": [["impactMetal_light_002"], -8.0, false],
+	&"boss_intro": [["synth/boss_intro.wav"], -13.5, false],
+	&"boss_aim": [["synth/boss_aim.wav"], -19.0, false],
+	&"boss_strike": [["synth/boss_strike.wav"], -10.0, false],
+	&"boss_dodged": [["synth/boss_dodged.wav"], -14.5, false],
+	&"boss_enraged": [["synth/boss_enraged.wav"], -12.0, false],
+	&"shield": [["synth/shield.wav"], -11.5, false],
 	# Between rooms: the offer is a hand of cards
-	&"deal": [["card-fan-1"], -8.0, false],
-	&"card_hover": [["card-slide-1", "card-slide-5"], -12.0, true],
-	&"take": [["card-place-1"], -6.0, false],
-	&"skip": [["back_003"], -8.0, false],
-	&"heal": [["powerUp2"], -10.0, false],
+	&"deal": [["synth/deal.wav"], -13.5, false],
+	&"card_hover": [["synth/card_hover.wav"], -17.5, true],
+	&"take": [["synth/take.wav"], -16.0, false],
+	&"skip": [["synth/skip.wav"], -15.5, false],
+	&"heal": [["synth/heal.wav"], -15.5, false],
 	# Endings (8-bit jingles)
-	&"room_won": [["jingles_NES03"], -12.0, false],
-	&"boss_defeated": [["jingles_NES12"], -11.0, false],
-	&"room_lost": [["jingles_NES11"], -12.0, false],
+	&"room_won": [["kenney/jingles_NES03.ogg"], -12.0, false],
+	&"boss_defeated": [["kenney/jingles_NES12.ogg"], -11.0, false],
+	&"room_lost": [["kenney/jingles_NES11.ogg"], -12.0, false],
 }
 
 static var _main: Sfx
@@ -97,9 +99,9 @@ static func play(name: StringName, pitch := 1.0) -> void:
 		_main._play(name, pitch)
 
 
-## A note per shipped number: a semitone up each time, up to a fifth.
+## A note per shipped number: a step up the pentatonic each time, up to an octave.
 static func score_pitch(index: int) -> float:
-	return pow(2.0, mini(maxi(index - 1, 0), SCORE_STEPS) / 12.0)
+	return pow(2.0, SCORE_STEPS[clampi(index - 1, 0, SCORE_STEPS.size() - 1)] / 12.0)
 
 
 ## 0..100, saved in the settings; 0 mutes.
@@ -119,7 +121,7 @@ func _ready() -> void:
 	for row: Array in SOUNDS.values():
 		for file: String in row[0]:
 			if not _streams.has(file):
-				_streams[file] = load(DIR + file + ".ogg")
+				_streams[file] = load(DIR + file)
 
 
 ## Several sounds at once (a long shipment, the boss's rage) add up; the

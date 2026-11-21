@@ -57,15 +57,18 @@ not the repo.
 - Text is drawn only at 16, 20 and 32 px (`S`, `M`, `L`); other sizes blur
   the pixel font.
 - Sounds: screens call `Sfx.play(&"name")`; every name is a row in
-  `Sfx.SOUNDS` (`ui/sfx.gd`: files, volume, pitch spread), and the files are
-  Kenney CC0 packs in `assets/sounds/kenney/`. `tests/test_sfx.gd` checks that
-  every file loads, every played name exists and no file goes unused. You
-  cannot hear the sounds: pick them by name, length and loudness (the 8-bit
-  jingles by their pitch going up or down), and say the user should listen.
-  Set a new row's dB so the played loudness (the file's RMS + the dB) sits in
-  the bands described at the top of `ui/sfx.gd`; a player found the first
-  levels painful. Measure a file by decoding it with
-  `AudioStreamPlayback.mix_audio` in a scratch script.
+  `Sfx.SOUNDS` (`ui/sfx.gd`: files, volume, pitch spread). The effects are
+  synthesized by `tools/make_sfx.gd` into `assets/sounds/synth/` (one soft
+  chiptune family in C major; it replaced a mix of five Kenney packs that
+  players found weak); only the 8-bit jingles are Kenney files in
+  `assets/sounds/kenney/`. To change a sound, edit its voices in the tool, run
+  it (`$GODOT --headless --path . -s res://tools/make_sfx.gd`), then
+  `--import`, and copy the printed dB into `Sfx.SOUNDS` and the RMS into
+  `tests/test_sfx.gd`. The test checks every file loads, every played name
+  exists, no file goes unused and nothing plays over -24 dB. You cannot hear
+  the sounds: say the user should listen. Played loudness (the file's RMS + the
+  dB) sits in the bands at the top of `ui/sfx.gd`; a player found the first
+  levels painful.
 - Icons are 16×16 cells of Kenney's 1-Bit Pack (`assets/icons/kenney_1bit.png`,
   49×22 cells), tinted when drawn; `ui/icons.gd` maps items, the boss and UI
   glyphs to cells. Check a new cell by rendering it: neighbouring cells are
@@ -109,8 +112,8 @@ only apply to this machine go in `CLAUDE.local.md`.
   Adversary, then Pancake and Quick with the Burnt Stack, floor 2 tuned for
   a 5-item hand; 13 items (Spatula and Median of Three for the new
   algorithms) in 6 slots, a full hand replaces one; a shop after rooms 2, 4
-  and 6; at most 6 numbers per shipment; title screen, settings and pause menu; sound
-  effects (levels checked by ear) and icons from the 1-Bit Pack.
+  and 6; at most 6 numbers per shipment; title screen, settings and pause menu; synthesized
+  sound effects (players found them much better than the Kenney mix) and icons from the 1-Bit Pack.
 - Open questions: a strong build still clears floor 1 rooms with one
   shipment (76–81%, the 6-number cap cut Quick's 43% to 14–19% but not
   this); with the cap, waiting matters less in Insertion (greedy 26–30%

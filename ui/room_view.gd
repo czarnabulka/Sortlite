@@ -857,11 +857,11 @@ func _update_ghosts(delta: float) -> void:
 func _pop(g: Ghost) -> void:
 	Sfx.play(&"score", Sfx.score_pitch(g.chain))
 	if g.chain >= 4:
-		Sfx.play(&"chips")  # at its own pitch: pitched up it hissed
+		Sfx.play(&"chips")  # at its own pitch, under the note
 	# Items that added to this number show it over their rows; a glass ping
 	# on every number as well was too much.
 	if g.chain == ship_total and ship_total >= 3:
-		# The last number of a long shipment: a handful of chips, bigger the longer it was.
+		# The last number of a shipment: a chord, bigger the longer it was.
 		Sfx.play(&"combo_big" if ship_total >= 7 else (&"combo_mid" if ship_total >= 5 else &"combo_small"))
 		if _is_fanfare():
 			Sfx.play(&"combo_fanfare")
