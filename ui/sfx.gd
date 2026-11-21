@@ -43,6 +43,8 @@ const SOUNDS := {
 	&"insert": [["synth/insert.wav"], -16.5, true],
 	&"flip": [["synth/flip.wav"], -16.5, true],
 	&"partition": [["synth/partition.wav"], -19.0, true],
+	&"merge": [["synth/merge.wav"], -20.0, true],
+	&"pop": [["synth/pop.wav"], -19.5, true],
 	&"wrong": [["synth/wrong.wav"], -21.5, false],
 	&"arrive": [["synth/arrive.wav"], -16.5, true],
 	&"ship": [["synth/ship.wav"], -18.0, false],

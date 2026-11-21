@@ -17,7 +17,7 @@ extends SceneTree
 ## `--cap 6` (at most that many numbers per shipment instead of
 ## Run.MAX_SHIP; `--cap -1` = no cap). Items are
 ## drawn from those that work in the room's algorithm. By floor 2 a player
-## holds 4-5 items: `--items 4,5`. `--build sieve,doubler` plays a fixed
+## holds 4-5 items (`--items 4,5`), by floor 3 all 6 (`--items 6`). `--build sieve,doubler` plays a fixed
 ## build instead (in that slot order), to see what a chosen build does.
 ##
 ## "one-shot" is the share of rooms where a single shipment scored the whole

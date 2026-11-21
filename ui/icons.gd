@@ -24,12 +24,17 @@ const ITEMS := {
 	&"express_lane": {"glyph": Vector2i(24, 12), "bg": "9a3f6b", "fg": "ffd1ea"},  # an arrow up
 	&"spatula": {"glyph": Vector2i(42, 5), "bg": "8a6a3a", "fg": "ffe8b0"},  # a shovel: the spatula
 	&"median_of_three": {"glyph": Vector2i(39, 20), "bg": "3d6b8a", "fg": "dff2ff"},  # ÷: divide and conquer
+	&"galloping": {"glyph": Vector2i(28, 7), "bg": "7a5a3a", "fg": "ffe8c0"},  # a horse
+	&"sift_down": {"glyph": Vector2i(30, 21), "bg": "2f5f8a", "fg": "d6f0ff"},  # a thick arrow down
+	&"tail_call": {"glyph": Vector2i(37, 17), "bg": "8a3a5a", "fg": "ffd6e8"},  # 2: scores twice
+	&"off_by_one": {"glyph": Vector2i(36, 17), "bg": "4a6a2a", "fg": "e8ffcf"},  # 1
 }
 
 ## Boss id (RoomSession.BOSSES) -> its face.
 const BOSSES := {
 	&"adversary": {"glyph": Vector2i(34, 12), "bg": "3a1418", "fg": "f2d36b"},  # a skull
 	&"burnt": {"glyph": Vector2i(14, 11), "bg": "3a2418", "fg": "ffb46b"},  # a fire on a grill
+	&"leak": {"glyph": Vector2i(28, 11), "bg": "142a3a", "fg": "6bd6ff"},  # a drop
 }
 
 ## Plain glyphs for the interface, drawn in any colour.

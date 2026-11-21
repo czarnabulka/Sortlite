@@ -38,3 +38,15 @@ func insertion_room(values: Array, target := 1_000_000, budget := 100, capacity 
 		bus: EventBus = null, has_arrivals := false) -> Room:
 	var cap := capacity if capacity > 0 else maxi(values.size(), 1)
 	return Room.new(InsertionAlgorithm.new(), Board.new(cap, values), target, budget, bus, has_arrivals)
+
+
+func merge_room(values: Array, target := 1_000_000, budget := 100, capacity := -1,
+		bus: EventBus = null, has_arrivals := false) -> Room:
+	var cap := capacity if capacity > 0 else maxi(values.size(), 1)
+	return Room.new(MergeAlgorithm.new(), Board.new(cap, values), target, budget, bus, has_arrivals)
+
+
+func heap_room(values: Array, target := 1_000_000, budget := 100, capacity := -1,
+		bus: EventBus = null, has_arrivals := false) -> Room:
+	var cap := capacity if capacity > 0 else maxi(values.size(), 1)
+	return Room.new(HeapAlgorithm.new(), Board.new(cap, values), target, budget, bus, has_arrivals)

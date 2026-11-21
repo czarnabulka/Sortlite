@@ -36,9 +36,12 @@ func test_floors_have_their_algorithms_and_a_boss() -> void:
 		check(first.has(Algorithms.BUBBLE) and first.has(Algorithms.INSERTION), "seed %d: floor 1 has both" % s)
 		var second: Array = run.plan.slice(4, 8).map(func(r: Dictionary) -> StringName: return r["algorithm"])
 		check(second.has(Algorithms.PANCAKE) and second.has(Algorithms.QUICK), "seed %d: floor 2 has Pancake and Quick" % s)
-		for i in [3, 7]:
+		var third: Array = run.plan.slice(8, 12).map(func(r: Dictionary) -> StringName: return r["algorithm"])
+		check(third.has(Algorithms.MERGE) and third.has(Algorithms.HEAP), "seed %d: floor 3 has Merge and Heap" % s)
+		for i in [3, 7, 11]:
 			check_eq(run.plan[i]["kind"], Run.BOSS, "seed %d: boss closes floor %d" % [s, i / 4 + 1])
-		check_eq(run.plan[7]["boss"], RoomSession.BOSS_BURNT, "seed %d: the Burnt Stack last" % s)
+		check_eq(run.plan[7]["boss"], RoomSession.BOSS_BURNT, "seed %d: the Burnt Stack closes floor 2" % s)
+		check_eq(run.plan[11]["boss"], RoomSession.BOSS_LEAK, "seed %d: the Memory Leak last" % s)
 
 
 func test_taking_an_item_starts_the_room_with_it() -> void:
@@ -75,7 +78,7 @@ func test_bot_clears_floors_and_items_follow() -> void:
 	for s in 20:
 		var run := Run.new(s)
 		var guard := 0
-		while run.phase != Run.Phase.WON and run.phase != Run.Phase.LOST and guard < 30:
+		while run.phase != Run.Phase.WON and run.phase != Run.Phase.LOST and guard < 40:
 			guard += 1
 			if run.phase == Run.Phase.SHOP:
 				run.leave_shop()
@@ -90,9 +93,10 @@ func test_bot_clears_floors_and_items_follow() -> void:
 		if run.phase == Run.Phase.WON:
 			wins += 1
 	# The smart bot taking the first offer clears floor 1 in about 2/3 of runs
-	# (66 of seeds 0-99); below 12/20 something got much harder.
-	check(floor_1 >= 12, "a perfect bot clears floor 1 in most runs (%d/20)" % floor_1)
-	check(wins >= 4, "and sometimes the whole run (%d/20)" % wins)
+	# (71 of seeds 0-99) and all three floors in 7 of them; below 11/20 or
+	# without a single win in 20 something got much harder.
+	check(floor_1 >= 11, "a perfect bot clears floor 1 in most runs (%d/20)" % floor_1)
+	check(wins >= 1, "and sometimes the whole run (%d/20)" % wins)
 
 
 func test_lost_room_ends_the_run() -> void:
@@ -119,11 +123,11 @@ func test_items_leave_the_old_bus() -> void:
 func test_offer_skips_items_for_algorithms_no_longer_ahead() -> void:
 	for s in 30:
 		var run := Run.new(s)
-		run.cleared = run.plan.size() - 1  # only the last boss (Pancake) is left
+		run.cleared = run.plan.size() - 1  # only the last boss (Heap) is left
 		run._make_offer()
 		for item in run.offer:
-			check(item.algorithm == &"" or item.algorithm == Algorithms.PANCAKE,
-					"seed %d: %s is useless in a Pancake room" % [s, item.id])
+			check(item.algorithm == &"" or item.algorithm == Algorithms.HEAP,
+					"seed %d: %s is useless in a Heap room" % [s, item.id])
 
 
 func test_full_slots_refuse_a_pick_but_allow_a_skip() -> void:

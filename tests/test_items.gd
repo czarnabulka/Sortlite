@@ -212,3 +212,51 @@ func test_cost_item_pings_when_the_move_is_made() -> void:
 	room.start()
 	room.play({"type": Events.INSERT, "to": 0})
 	check(bus.events_seen().has(Events.ITEM_TRIGGERED), "ping after the move")
+
+
+func test_galloping_charges_switches_between_runs() -> void:
+	var bus := EventBus.new()
+	ItemCatalog.galloping().attach(bus)
+	var room := merge_room([5, 9, 1, 2, 3], 1_000_000, 100, -1, bus)
+	room.manual_ship = true
+	room.start()
+	room.play({"type": Events.MERGE, "index": 0})
+	check_eq(room.board.values(), [1, 2, 3, 5, 9], "merged")
+	check_eq(room.budget, 99, "one switch instead of four comparisons")
+
+
+func test_sift_down_sinks_the_new_root_after_a_pop() -> void:
+	var bus := EventBus.new()
+	ItemCatalog.sift_down().attach(bus)
+	var room := heap_room([9, 4, 7, 1, 2], 1_000_000, 100, -1, bus)
+	room.manual_ship = true
+	room.start()
+	room.play({"type": Events.POP})
+	check_eq(room.board.values(), [7, 4, 2, 1, 9], "2 sank under 7 for free")
+	check_eq(room.budget, 99, "only the pop was paid")
+
+
+func test_tail_call_doubles_the_last_numbers_points() -> void:
+	var bus := EventBus.new()
+	ItemCatalog.tail_call().attach(bus)
+	var room := quick_room([1, 2, 3], 1_000_000, 100, -1, bus)
+	room.manual_ship = true
+	room.start()
+	room.play({"type": Events.SHIP, "count": 3})
+	# 1 2 3 is a straight and all Fibonacci: mult 3 + 6 + 6 = 15; the 3 scores 60, not 30
+	check_eq(room.score, (10 + 20 + 60) * 15, "last number twice")
+
+
+func test_off_by_one_lets_a_straight_skip_one_value() -> void:
+	var bus := EventBus.new()
+	ItemCatalog.off_by_one().attach(bus)
+	var room := quick_room([4, 5, 7], 1_000_000, 100, -1, bus)
+	room.manual_ship = true
+	room.start()
+	room.play({"type": Events.SHIP, "count": 3})
+	check_eq(room.score, (40 + 50 + 70) * 9, "4 5 7 counts as a straight: mult 3 + 6")
+	var plain := quick_room([4, 5, 8], 1_000_000, 100, -1, bus)
+	plain.manual_ship = true
+	plain.start()
+	plain.play({"type": Events.SHIP, "count": 3})
+	check_eq(plain.score, (40 + 50 + 80) * 3, "two values missing: no straight")

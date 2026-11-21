@@ -11,7 +11,8 @@ const MEDIAN := &"median"
 const IDS: Array[StringName] = [
 	&"sieve", &"bubble_pump", &"doubler", &"warm_cache", &"parity_bit",
 	&"fibonacci_spiral", &"power_tower", &"chain_reactor", &"fuse", &"binary_search",
-	&"express_lane", &"spatula", &"median_of_three",
+	&"express_lane", &"spatula", &"median_of_three", &"galloping", &"sift_down",
+	&"tail_call", &"off_by_one",
 ]
 
 
@@ -30,6 +31,10 @@ static func make(id: StringName) -> Item:
 		&"express_lane": return express_lane()
 		&"spatula": return spatula()
 		&"median_of_three": return median_of_three()
+		&"galloping": return galloping()
+		&"sift_down": return sift_down()
+		&"tail_call": return tail_call()
+		&"off_by_one": return off_by_one()
 	push_error("ItemCatalog: unknown id '%s'" % id)
 	return null
 
@@ -230,3 +235,78 @@ static func median_of_three() -> Item:
 		if ctx.element.has_marker(MEDIAN):
 			ctx.apply(&"median_of_three", ScoreContext.XMULT, 2))
 	return item
+
+
+## Merge only: a merge costs one move per switch between the two runs in the
+## merged row, not one per number (Timsort's galloping mode: a long stretch
+## from one run is copied whole).
+static func galloping() -> Item:
+	return Item.new(&"galloping", [Events.BEFORE_MOVE, Events.MERGE]) 		.only_for(Algorithms.MERGE) 		.react(Events.BEFORE_MOVE, func(data: Dictionary) -> void:
+			var ctx: MoveContext = data["ctx"]
+			if ctx.move.get("type") != Events.MERGE:
+				return
+			var room: Room = data["room"]
+			var c := maxi(1, (room.algorithm as MergeAlgorithm).switches(room.board, ctx.move))
+			if c < ctx.cost:
+				ctx.cost = c
+				ctx.note(&"galloping", "FX_CHEAPER"))
+
+
+## Heap only: after a right pop, the new root sinks for free, up to 2 levels,
+## always under its bigger child (the sift-down a pop needs).
+static func sift_down() -> Item:
+	return Item.new(&"sift_down", [Events.POP]) 		.only_for(Algorithms.HEAP) 		.react(Events.POP, func(data: Dictionary) -> void:
+			if data["wrong"]:
+				return
+			var room: Room = data["room"]
+			var board := room.board
+			var h := (room.algorithm as HeapAlgorithm).tree_size(board)
+			var p := 0
+			var sunk := 0
+			while sunk < 2:
+				var c := 2 * p + 1
+				if c >= h:
+					break
+				if c + 1 < h and board.value_at(c + 1) > board.value_at(c):
+					c += 1
+				if board.value_at(c) <= board.value_at(p):
+					break
+				board.swap(p, c)
+				p = c
+				sunk += 1
+			if sunk > 0:
+				_ping(data, &"sift_down", "FX_SIFT"))
+
+
+## The last number of a shipment of 3 or more scores its points twice.
+static func tail_call() -> Item:
+	var count := [0]  # boxed, so the lambdas share it
+	var item := Item.new(&"tail_call", [Events.HAND, Events.SURFACE])
+	item.react(Events.HAND, func(data: Dictionary) -> void:
+		count[0] = int(data["count"]))
+	item.react(Events.SURFACE, func(data: Dictionary) -> void:
+		var ctx: ScoreContext = data["ctx"]
+		if count[0] >= 3 and ctx.chain == count[0]:
+			ctx.apply(&"tail_call", ScoreContext.XPOINTS, 2)
+			count[0] = 0)
+	return item
+
+
+## A shipment of 3 or more with one value missing from its run (4 5 7) is a
+## straight too.
+static func off_by_one() -> Item:
+	return Item.new(&"off_by_one", [Events.HAND, Hands.STRAIGHT]) 		.react(Events.HAND, func(data: Dictionary) -> void:
+			var values: Array = data["values"]
+			var patterns: Array = data["patterns"]
+			if values.size() < 3 or patterns.has(Hands.STRAIGHT) or patterns.has(Hands.SAME):
+				return
+			var s := values.duplicate()
+			s.sort()
+			for i in range(1, s.size()):
+				if s[i] == s[i - 1]:
+					return
+			if int(s.back()) - int(s[0]) != s.size():
+				return
+			patterns.append(Hands.STRAIGHT)
+			data["mult"] = int(data["mult"]) + int(Hands.BONUS_PER_ELEMENT[Hands.STRAIGHT]) * values.size()
+			_ping(data, &"off_by_one", "FX_STRAIGHT"))

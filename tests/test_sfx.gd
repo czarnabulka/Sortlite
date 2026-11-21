@@ -69,7 +69,7 @@ func test_no_sound_is_much_louder_than_the_rest() -> void:
 		"synth/chips.wav": -16.6, "synth/combo_big.wav": -14.2, "synth/combo_mid.wav": -11.5,
 		"synth/combo_small.wav": -11.2, "synth/confirm.wav": -11.2, "synth/cursor.wav": -12.6,
 		"synth/deal.wav": -13.5, "synth/flip.wav": -13.4, "synth/heal.wav": -11.3,
-		"synth/insert.wav": -13.5, "synth/item.wav": -11.7, "synth/overflow.wav": -15.1,
+		"synth/insert.wav": -13.5, "synth/item.wav": -11.7, "synth/merge.wav": -10.0, "synth/pop.wav": -10.5, "synth/overflow.wav": -15.1,
 		"synth/partition.wav": -10.9, "synth/pattern.wav": -11.2, "synth/ready.wav": -13.4,
 		"synth/score.wav": -12.4, "synth/shield.wav": -15.4, "synth/ship.wav": -9.2,
 		"synth/skip.wav": -11.6, "synth/swap.wav": -10.9, "synth/take.wav": -11.0,

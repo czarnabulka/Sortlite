@@ -24,14 +24,24 @@ const FEED_ADVERSARY := &"adversary"
 ## - the Burnt Stack (a Pancake room where numbers have a burnt side)
 ##   scorches the clean number nearest the exit; moving or shipping it first
 ##   makes it miss. Enraged, it sends burnt newcomers.
-## Either throws in an extra number when it has nothing to aim at.
+## - the Memory Leak (a Heap room) takes the top cell of the column away
+##   for good; a number in it is lost and costs a life like an overflow, so
+##   keeping a cell free dodges the loss. A shipment of LEAK_RECLAIM_AT or
+##   more numbers gives one lost cell back.
+## Each throws in an extra number when it has nothing to aim at.
 const BOSS_NONE := &""
 const BOSS_ADVERSARY := &"adversary"
 const BOSS_BURNT := &"burnt"
-const BOSSES: Array[StringName] = [BOSS_ADVERSARY, BOSS_BURNT]
+const BOSS_LEAK := &"leak"
+const BOSSES: Array[StringName] = [BOSS_ADVERSARY, BOSS_BURNT, BOSS_LEAK]
 const STRIKE_SWAP := &"swap"
 const STRIKE_SCORCH := &"scorch"
+const STRIKE_LEAK := &"leak"
 const STRIKE_THROW := &"throw"
+## The Memory Leak never takes the column below this many cells.
+const LEAK_MIN_CAPACITY := 4
+## A shipment this long frees one leaked cell.
+const LEAK_RECLAIM_AT := 3
 
 const DEFAULTS := {
 	"algorithm": &"bubble",
@@ -87,6 +97,8 @@ var strike_index := -1
 ## move sooner and strikes come one move sooner.
 var enraged := false
 var enrage_at: int
+## The column's size before the Memory Leak took any cells.
+var full_capacity: int
 
 var timer := 0.0
 var moves_since_arrival := 0
@@ -113,6 +125,7 @@ func _init(p_seed: int, p_mode: ArrivalMode, p_items: Array[Item] = [], config: 
 
 	bus = EventBus.new()
 	bus.on(Events.ARRIVE, _on_arrive)
+	bus.on(Events.HAND, _on_hand)
 	for item in p_items:
 		item.detach()  # items move from room to room with the run
 		item.attach(bus)  # slot order = effect order
@@ -131,6 +144,7 @@ func _init(p_seed: int, p_mode: ArrivalMode, p_items: Array[Item] = [], config: 
 	if boss == BOSS_BURNT and room.algorithm is PancakeAlgorithm:
 		(room.algorithm as PancakeAlgorithm).burnt_sides = true
 	ships_max = room.ships_left
+	full_capacity = room.board.capacity
 	next_value = _roll()
 
 
@@ -245,6 +259,15 @@ func _aim() -> void:
 	strike_mode = STRIKE_THROW
 	var board := room.board
 	var exit_low := room.algorithm.surface_index(board) == 0 if not board.is_empty() else true
+	if boss == BOSS_LEAK:
+		if board.capacity > LEAK_MIN_CAPACITY:
+			strike_mode = STRIKE_LEAK
+			strike_index = board.capacity - 1
+			var lost := leak_victim()
+			if lost >= 0:
+				strike_uids = [board.cells[lost].uid]
+		bus.emit(Events.BOSS_AIM, {"room": room, "mode": strike_mode, "uids": strike_uids.duplicate()})
+		return
 	if boss == BOSS_BURNT:
 		for k in board.size():
 			var i := k if exit_low else board.size() - 1 - k
@@ -279,6 +302,9 @@ func _strike() -> void:
 		return
 	if mode == STRIKE_SCORCH:
 		_scorch()
+		return
+	if mode == STRIKE_LEAK:
+		_leak()
 		return
 	if mode != STRIKE_SWAP:
 		return
@@ -315,6 +341,42 @@ func _scorch() -> void:
 		bus.emit(Events.BOSS_DODGED, {"room": room})
 
 
+## The Memory Leak takes the top cell. A number still in it (the column is
+## full) is lost: the tree's last leaf, never the ready run.
+func _leak() -> void:
+	strike_uids.clear()
+	strike_index = -1
+	var board := room.board
+	var lost := leak_victim()
+	board.capacity -= 1
+	var value := -1
+	if lost >= 0:
+		value = board.remove_at(lost).value
+	bus.emit(Events.BOSS_STRIKE, {"room": room, "mode": STRIKE_LEAK, "index": lost, "value": value})
+	if lost >= 0:
+		room.overflows += 1
+		var data := {"room": room, "value": value, "absorbed": false}
+		bus.emit(Events.OVERFLOW, data)
+		if not data["absorbed"]:
+			lives -= 1
+			if lives <= 0:
+				room.fail()
+	room.refresh()
+
+
+## Index of the number the next leak would take, or -1 while a cell is free.
+func leak_victim() -> int:
+	var board := room.board
+	if board.size() < board.capacity or board.is_empty():
+		return -1
+	return maxi(room.algorithm.arrive_index(board) - 1, 0)
+
+
+## Cells the Memory Leak has taken so far.
+func leaked() -> int:
+	return full_capacity - room.board.capacity
+
+
 func is_aiming() -> bool:
 	return strike_mode != &""
 
@@ -336,6 +398,13 @@ func _on_arrive(data: Dictionary) -> void:
 		e.markers[Element.CURSED] = true
 	if boss == BOSS_BURNT and enraged:
 		e.markers[Element.BURNT] = true
+
+
+## A long enough shipment frees one leaked cell.
+func _on_hand(data: Dictionary) -> void:
+	if boss == BOSS_LEAK and int(data["count"]) >= LEAK_RECLAIM_AT and leaked() > 0:
+		room.board.capacity += 1
+		bus.emit(Events.MEMORY_FREED, {"room": room})
 
 
 ## An empty board has no moves, so nothing could ever happen in TURNS mode.

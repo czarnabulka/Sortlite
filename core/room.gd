@@ -210,11 +210,13 @@ func _ship(count: int) -> void:
 	var hand := Hands.evaluate(values)
 	if ships_left > 0:
 		ships_left -= 1
-	bus.emit(Events.HAND, {"room": self, "count": count, "values": values,
-			"mult": hand["mult"], "patterns": hand["patterns"]})
+	# Items may change the hand here (add a pattern and its mult).
+	var data := {"room": self, "count": count, "values": values,
+			"mult": hand["mult"], "patterns": hand["patterns"]}
+	bus.emit(Events.HAND, data)
 	for i in leaving.size():
 		board.remove_at(algorithm.surface_index(board))
-		_score(leaving[i], i + 1, int(hand["mult"]))
+		_score(leaving[i], i + 1, int(data["mult"]))
 	best_chain = maxi(best_chain, count)
 	if count >= 2:
 		bus.emit(Events.CHAIN, {"room": self, "length": count})

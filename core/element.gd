@@ -11,6 +11,8 @@ var markers: Dictionary = {}  # StringName -> Variant
 const CURSED := &"cursed"
 ## Burnt side up (the Burnt Stack boss): scores half.
 const BURNT := &"burnt"
+## Popped from a heap (Heap rooms): it waits at the exit until shipped.
+const POPPED := &"popped"
 
 
 func _init(p_value: int, p_uid: int) -> void:

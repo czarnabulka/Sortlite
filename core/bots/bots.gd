@@ -25,6 +25,10 @@ static func choose(algorithm: Algorithm, board: Board, ready := 0) -> Dictionary
 			return PancakeBot.choose(algorithm as PancakeAlgorithm, board, ready)
 		Algorithms.QUICK:
 			return QuickBot.choose(algorithm as QuickAlgorithm, board)
+		Algorithms.MERGE:
+			return MergeBot.choose(algorithm as MergeAlgorithm, board)
+		Algorithms.HEAP:
+			return HeapBot.choose(algorithm as HeapAlgorithm, board)
 		Algorithms.INSERTION:
 			# The one right place for the key.
 			for m in algorithm.legal_moves(board):

@@ -18,6 +18,7 @@ $GODOT --headless --path . -s res://tests/run_tests.gd      # tests; exit 0 = al
 $GODOT --headless --path . -s res://sim/sim_rooms.gd -- --ship              # balance: greedy vs smart bot per room
 $GODOT --headless --path . -s res://sim/sim_rooms.gd -- --ship --only boss_adversary --seeds 300
 $GODOT --headless --path . -s res://sim/sim_rooms.gd -- --ship --only "*quick" --items 0,5   # floor 2 with a floor-2 hand
+$GODOT --headless --path . -s res://sim/sim_rooms.gd -- --ship --only "*heap" --items 6      # floor 3 with a full hand
 $GODOT --headless --path . -s res://sim/sim_rooms.gd -- --ship --build sieve,doubler,bubble_pump,power_tower
 $GODOT --path . -s res://tools/shot.gd -- --screen room --room 1 --lang pl --out <png>   # screenshot (opens a window)
 ```
@@ -32,10 +33,10 @@ not the repo.
 - A rules or balance change: run the simulator. A ship room is tuned when the
   greedy bot (ships at once) usually misses the target and the smart bot
   (waits for better hands) usually makes it; today greedy wins 2–27% and smart
-  67–84% with no items. Floor 2 rooms are tuned the same way but with 5
-  random items (`--items 5`), since a player holds 5–6 by then; watch the
-  one-shot column (a single shipment clears the room). Update the balance
-  chart in the design document.
+  60–84% with no items. Floor 2 rooms are tuned the same way but with 5
+  random items (`--items 5`), floor 3 with 6 (`--items 6`), the hand a
+  player holds by then; watch the one-shot column (a single shipment clears
+  the room). Update the balance chart in the design document.
 - A UI change: take screenshots in English and Polish and look at them.
   Polish text is longer and wraps differently; check for overlaps and cut
   lines.
@@ -76,7 +77,8 @@ not the repo.
 - `tools/shot.gd -- --items a,b,c` gives the run items; `--screen reward`
   shows the item choice, `--screen shop` the shop (`--bits N`, `--replace`);
   `--seed 3` fixes the run (seed 3: floor 2 opens with a Quick fight and has
-  the Quick elite, `--room 4` / `--room 6`).
+  the Quick elite, `--room 4` / `--room 6`; floor 3 opens with Heap, then
+  Merge, `--room 8` / `--room 9`; `--room 11` is the Memory Leak).
 - Files use LF line endings. Python on Windows writes CRLF in text mode, so
   open files with `newline=""` (or `"\n"`) when editing them from a script.
 - Player settings are saved in `user://settings.cfg` on the user's machine.
@@ -108,17 +110,23 @@ only apply to this machine go in `CLAUDE.local.md`.
 ## Where things stand
 
 - Released: 0.3.4 (the game was called Roguesort before it; the GitHub repo
-  is now `czarnabulka/sortlite`, this folder still has the old name). Two floors (`Run.FLOORS`): Bubble and Insertion with the
-  Adversary, then Pancake and Quick with the Burnt Stack, floor 2 tuned for
-  a 5-item hand; 13 items (Spatula and Median of Three for the new
-  algorithms) in 6 slots, a full hand replaces one; a shop after rooms 2, 4
-  and 6; at most 6 numbers per shipment; title screen, settings and pause menu; synthesized
-  sound effects (players found them much better than the Kenney mix) and icons from the 1-Bit Pack.
+  is now `czarnabulka/sortlite`, this folder still has the old name).
+- Not released yet: a third floor. Three floors (`Run.FLOORS`): Bubble and
+  Insertion with the Adversary; Pancake and Quick with the Burnt Stack
+  (tuned for a 5-item hand); Merge and Heap with the Memory Leak (6 items).
+  17 items (Galloping, Sift Down, Tail Call, Off-by-One are new) in 6 slots,
+  a full hand replaces one, an algorithm's item is offered only on its
+  floor; a shop after rooms 2, 4, 6, 8 and 10; at most 6 numbers per
+  shipment; title screen, settings and pause menu; synthesized sound
+  effects and icons from the 1-Bit Pack.
 - Open questions: a strong build still clears floor 1 rooms with one
   shipment (76–81%, the 6-number cap cut Quick's 43% to 14–19% but not
   this); with the cap, waiting matters less in Insertion (greedy 26–30%
-  against 60–70%) and Quick (28%); are the Burnt Stack's sides readable to
-  players;
+  against 60–70%), Quick (29–34%) and Merge (about a third), where a move
+  hands out a long ready run at once; Heap is the opposite (greedy never
+  wins: it pops one number at a time); a whole run is long now (the
+  first-offer bot wins 7 of 100); are the Burnt Stack's sides readable to
+  players; is the Heap tree (lines beside the column) readable;
   are strong builds rewarded right (after the Sieve and
   Doubler nerf, Sieve + Doubler + Bubble Pump + Power Tower scores about 3×
   a room's target, was 5×);

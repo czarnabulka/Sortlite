@@ -21,17 +21,19 @@ settings (language, sound volume, CRT effect, fullscreen, arrivals by moves
 or by time) and quit. ESC during a run opens the pause menu.
 
 Options after `--`, for testing: `--seed 123` replays a run, `--demo` lets the
-bot play, `--skip 3` jumps to a room (0–7; 3 and 7 are the bosses); these
+bot play, `--skip 3` jumps to a room (0–11; 3, 7 and 11 are the bosses); these
 three start a run at once. `--lang pl` picks the language for one launch, and
 `--classic` plays the older rooms where sorted numbers leave by themselves.
 
 ## How it plays
 
-- A run is two floors of four rooms: two fights, an elite and a boss. Floor 1
-  has Bubble and Insertion rooms and the Adversary; floor 2 brings Pancake,
-  Quick and the Burnt Stack. Before each room you pick 1 of 3 items (up to
-  6; slot order is the order they act in). With every slot full, a new item
-  replaces one you choose and takes its slot.
+- A run is three floors of four rooms: two fights, an elite and a boss.
+  Floor 1 has Bubble and Insertion rooms and the Adversary; floor 2 brings
+  Pancake, Quick and the Burnt Stack; floor 3 Merge, Heap and the Memory
+  Leak. Before each room you pick 1 of 3 items (up to 6; slot order is the
+  order they act in). With every slot full, a new item replaces one you
+  choose and takes its slot. An item for one algorithm is offered only on
+  its floor.
 - After every second room a shop sells 3 items for bits (8 each) and one
   more shipment for the next room (5). Bits come from cleared rooms, unused
   moves and skipped items.
@@ -43,6 +45,12 @@ three start a run at once. `--lang pl` picks the language for one launch, and
   **Quick**: pick a pivot in a segment not yet in place; the segment splits
   around it (1 move per other number in it) and the pivot lands in place;
   the smallest number is ready at the exit.
+  **Merge**: stretches that already go up are runs; merge a run with the
+  next one (1 move per number in both, less one); the smallest number is
+  ready at the exit.
+  **Heap**: the column under the ready run is a binary tree with its root at
+  the bottom; lift a number over its parent (1 move) or pop the root (1
+  move): when it is the tree's biggest it joins the ready run at the top.
 - Ready numbers wait at the exit. **E** ships them as one hand (1 move, up
   to 6 numbers), **Q** ships fewer. Each number scores `value × 10 × mult`; the mult is the
   hand's length plus a bonus per number for each pattern:
@@ -61,15 +69,17 @@ three start a run at once. `--lang pl` picks the language for one launch, and
   score half and swaps a sorted pair every few moves (move it to dodge). The
   Burnt Stack gives every number a burnt side that a flip turns over (burnt
   side up scores half) and scorches the clean number nearest the exit (move or
-  ship it to dodge). Both get faster at half HP, and a shield stops any single
-  shipment from taking more than half their HP.
+  ship it to dodge). The Memory Leak takes the top cell of the column every
+  few moves, with any number in it (keep a cell free to dodge); a shipment of
+  3 or more wins a cell back. All get faster at half HP, and a shield stops
+  any single shipment from taking more than half their HP.
 
 ## Controls
 
 | Key | Action |
 |-----|--------|
-| W / S, arrows, mouse wheel | pick a pair (Bubble), a place for the key (Insertion), where the spatula goes (Pancake) or a pivot (Quick) |
-| SPACE, click | swap / insert / flip / split |
+| W / S, arrows, mouse wheel | pick a pair (Bubble), a place for the key (Insertion), where the spatula goes (Pancake), a pivot (Quick), a run (Merge) or a number (Heap; the root pops) |
+| SPACE, click | swap / insert / flip / split / merge / lift or pop |
 | E | ship the ready numbers |
 | Q / right-click | ship fewer / ship up to the clicked number |
 | F | let the next number in now |

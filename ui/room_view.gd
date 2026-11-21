@@ -187,6 +187,10 @@ func set_session(p_session: RoomSession, p_room_no: int, p_room_total: int, p_ki
 	bus.on(Events.INSERT, _on_insert)
 	bus.on(Events.FLIP, _on_flip)
 	bus.on(Events.PARTITION, _on_partition)
+	bus.on(Events.MERGE, _on_merge)
+	bus.on(Events.SIFT, _on_sift)
+	bus.on(Events.POP, _on_pop)
+	bus.on(Events.MEMORY_FREED, _on_memory_freed)
 	bus.on(Events.WRONG_MOVE, _on_wrong)
 	bus.on(Events.SURFACE, _on_surface)
 	bus.on(Events.CHAIN, _on_chain)
@@ -246,14 +250,40 @@ func is_quick() -> bool:
 	return session.room.algorithm.id == Algorithms.QUICK
 
 
+func is_merge() -> bool:
+	return session.room.algorithm.id == Algorithms.MERGE
+
+
+func is_heap() -> bool:
+	return session.room.algorithm.id == Algorithms.HEAP
+
+
+## Merge: the first cell of every run that has a next run (what SPACE merges).
+func _merge_starts() -> Array[int]:
+	var out: Array[int] = []
+	for m in session.room.algorithm.legal_moves(session.room.board):
+		out.append(int(m["index"]))
+	return out
+
+
+## Heap: how many cells from the bottom form the tree.
+func _tree_size() -> int:
+	return (session.room.algorithm as HeapAlgorithm).tree_size(session.room.board)
+
+
 ## Quick: true for every number already in its final place (not a pivot).
 func _placed() -> Array[bool]:
 	return (session.room.algorithm as QuickAlgorithm).placed(session.room.board)
 
 
-## Bubble and Pancake stack from the bottom: index 0 is the lowest cell.
+## Bubble, Pancake and Heap stack from the bottom: index 0 is the lowest cell.
 func _bottom_up() -> bool:
-	return is_bubble() or is_pancake()
+	return is_bubble() or is_pancake() or is_heap()
+
+
+## The exit is over the last cell (Bubble, Heap), not over cell 0.
+func _exit_at_end() -> bool:
+	return is_bubble() or is_heap()
 
 
 ## Where scored numbers fly to: over the column, or under it in Pancake.
@@ -302,7 +332,7 @@ func _cell_at(p: Vector2) -> int:
 
 ## How far from the exit cell `i` is, counting the exit cell as 1.
 func _exit_distance(i: int) -> int:
-	return session.room.board.size() - i if is_bubble() else i + 1
+	return session.room.board.size() - i if _exit_at_end() else i + 1
 
 
 func is_boss() -> bool:
@@ -412,6 +442,15 @@ func _step_selection(direction: int) -> void:
 	if lo_hi.y < lo_hi.x:
 		return
 	var before := selected
+	if is_merge():
+		# From one run to the next: each run start is a merge.
+		var starts := _merge_starts()
+		var k := starts.find(selected)
+		k = clampi(k - direction, 0, starts.size() - 1) if k >= 0 else 0
+		if starts[k] != selected:
+			selected = starts[k]
+			Sfx.play(&"cursor")
+		return
 	if is_quick():
 		# Skip the numbers already in place: only the others can be pivots.
 		var done := _placed()
@@ -443,6 +482,10 @@ func _selection_range() -> Vector2i:
 		return Vector2i(0, board.size() - (1 if sides else 2))
 	if is_quick():
 		return Vector2i(0, board.size() - 1) if _placed().has(false) else Vector2i(0, -1)
+	if is_merge():
+		return Vector2i(0, board.size() - 1) if not _merge_starts().is_empty() else Vector2i(0, -1)
+	if is_heap():
+		return Vector2i(0, _tree_size() - 1)
 	var k := board.sorted_prefix_length()
 	if k >= board.size():
 		return Vector2i(0, -1)
@@ -451,6 +494,12 @@ func _selection_range() -> Vector2i:
 
 func _reset_selection() -> void:
 	var r := _selection_range()
+	if is_merge():
+		# Keep a run start that is still one, else the run nearest the exit.
+		var starts := _merge_starts()
+		if not starts.has(selected):
+			selected = starts[0] if not starts.is_empty() else 0
+		return
 	if is_quick():
 		# Keep a pivot that is still one, else the first number not in place.
 		var done := _placed()
@@ -471,6 +520,10 @@ func _act(target: int) -> void:
 		move = {"type": Events.FLIP, "index": target}
 	elif is_quick():
 		move = {"type": Events.PARTITION, "index": target}
+	elif is_merge():
+		move = {"type": Events.MERGE, "index": target}
+	elif is_heap():
+		move = {"type": Events.POP} if target == 0 else {"type": Events.SIFT, "index": target}
 	if not session.play(move):
 		return
 	if session.room.wrong_moves > wrong_before:
@@ -479,6 +532,12 @@ func _act(target: int) -> void:
 		# After a correct swap follow the element up, so SPACE keeps carrying it.
 		if session.room.wrong_moves == wrong_before:
 			selected = target + 1
+		var r := _selection_range()
+		selected = clampi(selected, r.x, maxi(r.y, 0))
+	elif is_heap():
+		# After a lift follow the number up, so SPACE keeps lifting it; after
+		# a pop, the new root's first child.
+		selected = HeapAlgorithm.parent(target) if target > 0 else 1
 		var r := _selection_range()
 		selected = clampi(selected, r.x, maxi(r.y, 0))
 	else:
@@ -495,8 +554,18 @@ func _target_at(p: Vector2) -> int:
 	var j: int
 	if is_bubble():
 		j = int(roundf((_tank_bottom() - p.y) / SLOT_H)) - 1
-	elif is_pancake():
+	elif is_pancake() or is_heap():
 		j = int(floorf((_tank_bottom() - p.y) / SLOT_H))
+	elif is_merge():
+		# A click anywhere on a run picks it; the last run merges with the one before.
+		j = int(floorf((p.y - TANK_TOP) / SLOT_H))
+		if j < 0 or j >= board.size():
+			return -1
+		var pick := -1
+		for st in _merge_starts():
+			if st <= j:
+				pick = st
+		return pick
 	elif is_quick():
 		j = int(floorf((p.y - TANK_TOP) / SLOT_H))
 		if j >= 0 and j < board.size() and _placed()[j]:
@@ -550,12 +619,51 @@ func _on_partition(_data: Dictionary) -> void:
 		pending_arc[e.uid] = 10.0
 
 
+## A merge: the numbers of both runs swing out on their way into one run.
+func _on_merge(data: Dictionary) -> void:
+	Sfx.play(&"merge")
+	var cells := session.room.board.cells
+	var s0: int = data["move"]["index"]
+	for k in range(s0, cells.size()):
+		pending_arc[cells[k].uid] = 8.0
+
+
+func _on_sift(data: Dictionary) -> void:
+	if not data["wrong"]:
+		Sfx.play(&"swap")
+	var i: int = data["move"]["index"]
+	var cells := session.room.board.cells
+	pending_arc[cells[HeapAlgorithm.parent(i)].uid] = 14.0
+	pending_arc[cells[i].uid] = -14.0
+
+
+## A pop: the root and the last leaf trade places with a wide swing.
+func _on_pop(data: Dictionary) -> void:
+	if not data["wrong"]:
+		Sfx.play(&"pop")
+	var cells := session.room.board.cells
+	var top := _tree_size()  # a popped root now sits right over the tree
+	if top < cells.size():
+		pending_arc[cells[top].uid] = 26.0
+	pending_arc[cells[0].uid] = -26.0
+
+
+func _on_memory_freed(_data: Dictionary) -> void:
+	Sfx.play(&"heal")
+	var text := tr("MEMORY_FREED")
+	var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, M).x
+	_float(text, Vector2(TANK_CX - w * 0.5, TANK_TOP + 20), Palette.GOOD, M)
+
+
 func _on_wrong(data: Dictionary) -> void:
 	Sfx.play(&"wrong")
 	var move: Dictionary = data["move"]
 	var j: int = move.get("index", move.get("to", 0))
 	if is_bubble():
 		_float(tr("WRONG_SWAP"), Vector2(TANK_CX + TANK_W * 0.5 + 14, _slot_pos(j).y - 8), Palette.BAD, S)
+	elif is_heap():
+		var key := "WRONG_POP" if move.get("type") == Events.POP else "WRONG_SIFT"
+		_float(tr(key), Vector2(TANK_CX + TANK_W * 0.5 + 34, _slot_pos(j).y - 8), Palette.BAD, S)
 	elif is_pancake():
 		_float(tr("WRONG_FLIP"), Vector2(TANK_CX + TANK_W * 0.5 + 14, _slot_pos(j).y - 8), Palette.BAD, S)
 	else:
@@ -569,7 +677,7 @@ func _on_surface(data: Dictionary) -> void:
 	var g := Ghost.new()
 	g.value = ctx.element.value
 	var v: Vis = vis.get(ctx.element.uid)
-	g.start = v.pos if v != null else _slot_pos(session.room.board.size() if is_bubble() else 0)
+	g.start = v.pos if v != null else _slot_pos(session.room.board.size() if _exit_at_end() else 0)
 	g.pos = g.start
 	g.chain = ctx.chain
 	g.delay = SWAP_DUR + (ctx.chain - 1) * CHAIN_STEP
@@ -653,6 +761,13 @@ func _on_boss_strike(data: Dictionary) -> void:
 		var st := tr("BOSS_SCORCH")
 		var sw := font.get_string_size(st, HORIZONTAL_ALIGNMENT_LEFT, -1, L).x
 		_float(st, Vector2(TANK_CX - sw * 0.5, _slot_pos(i).y + 10), BURNT_EDGE, L)
+		return
+	if data["mode"] == RoomSession.STRIKE_LEAK:
+		shake = 5.0
+		tank_flash = 0.5
+		var lt := tr("BOSS_LEAK_HIT")
+		var lw := font.get_string_size(lt, HORIZONTAL_ALIGNMENT_LEFT, -1, L).x
+		_float(lt, Vector2(TANK_CX - lw * 0.5, _slot_pos(session.room.board.capacity).y + 10), Palette.BAD, L)
 		return
 	if data["mode"] == RoomSession.STRIKE_THROW:
 		shake = 5.0
@@ -1005,7 +1120,7 @@ func _draw_left_panel() -> void:
 	# Arrivals
 	_panel(Rect2(x, 256, w, 46))
 	_text(tr("ARRIVALS"), Vector2(x + 8, 274), S, Palette.MUTED)
-	var how := tr("EVERY_N_MOVES") % session.every_moves if mode == RoomSession.ArrivalMode.TURNS else tr("EVERY_N_SEC") % int(session.interval_sec)
+	var how := tr(_count_key("EVERY_N_MOVES", session.every_moves)) % session.every_moves if mode == RoomSession.ArrivalMode.TURNS else tr("EVERY_N_SEC") % int(session.interval_sec)
 	_text(how, Vector2(x + 8, 274), S, Palette.TEXT, right, w - 16)
 	_text(tr("LET_IN_NOW"), Vector2(x + 8, 293), S, Palette.SOFT)
 
@@ -1075,7 +1190,7 @@ func _draw_ship_box(box: Rect2) -> void:
 
 func _draw_tank() -> void:
 	var board := session.room.board
-	var cap := board.capacity
+	var cap := session.full_capacity
 	var bottom := _tank_bottom()
 	var r := Rect2(TANK_CX - TANK_W * 0.5, TANK_TOP, TANK_W, cap * SLOT_H)
 	draw_rect(r, Palette.TANK)
@@ -1088,6 +1203,7 @@ func _draw_tank() -> void:
 	elif board.is_full():
 		edge = edge.lerp(Palette.BAD, 0.4 + 0.3 * sin(time * 8.0))
 	draw_rect(r, edge, false, 1.0)
+	_draw_leaked(r)
 
 	# Exit line: over the column, or under it in Pancake (the plate)
 	var exit_y := bottom + 4.0 if is_pancake() else TANK_TOP - 4.0
@@ -1113,18 +1229,24 @@ func _draw_tank() -> void:
 		_draw_spatula(r, playing)
 	elif is_quick():
 		_draw_quick_guides(r, playing)
+	elif is_merge():
+		_draw_merge_guides(r, playing)
+	elif is_heap():
+		_draw_heap_guides(r, playing)
 	else:
 		_draw_insertion_guides(r, playing)
 	if is_ship() and playing:
 		_draw_ship_bracket(r)
 	if playing and session.is_aiming_cells():
 		_draw_aim(r)
+	if playing and session.strike_mode == RoomSession.STRIKE_LEAK:
+		_draw_leak_aim(r)
 
 	# Next arrival: under the column, or over it in Pancake (it drops on top)
 	var nb := Rect2(r.position.x, bottom + 5, TANK_W, 40)
 	if is_pancake():
 		nb = Rect2(r.position.x, 3, TANK_W, 36)
-	var throwing := playing and session.is_aiming() and not session.is_aiming_cells()
+	var throwing := playing and session.strike_mode == RoomSession.STRIKE_THROW
 	if throwing:
 		var a := 0.6 + 0.4 * sin(time * 10.0)
 		_panel(nb, Color(Palette.BAD, a), Palette.PANEL.lerp(Palette.BAD, 0.25 * a))
@@ -1162,8 +1284,8 @@ func _draw_ship_bracket(r: Rect2) -> void:
 ## the bottom, so its run is the top of the stack, not the top of the tank.
 func _run_span(count: int) -> Vector2:
 	var size := session.room.board.size()
-	var near := size - 1 if is_bubble() else 0
-	var far := size - count if is_bubble() else count - 1
+	var near := size - 1 if _exit_at_end() else 0
+	var far := size - count if _exit_at_end() else count - 1
 	var y1 := minf(_slot_pos(near).y, _slot_pos(far).y) - SLOT_H * 0.5 + 3.0
 	var y2 := maxf(_slot_pos(near).y, _slot_pos(far).y) + SLOT_H * 0.5 - 3.0
 	return Vector2(y1, y2)
@@ -1261,6 +1383,107 @@ func _draw_quick_guides(r: Rect2, playing: bool) -> void:
 	_text(tr("PIVOT"), Vector2(lane, sp.y - 2), S, Palette.GOLD)
 	var cost := algo.move_cost(board, {"type": Events.PARTITION, "index": selected})
 	_text(tr("COST_N") % cost, Vector2(lane, sp.y + 14), S, Palette.BAD if cost > session.room.budget else Palette.TEXT)
+
+
+## Merge: a bracket on the right of every run, the selected pair of runs
+## framed in gold, and what merging them would cost.
+func _draw_merge_guides(r: Rect2, playing: bool) -> void:
+	var board := session.room.board
+	var algo := session.room.algorithm as MergeAlgorithm
+	var c := Palette.SOFT.darkened(0.2)
+	for run in algo.runs(board):
+		var y1 := TANK_TOP + run.x * SLOT_H + 3.0
+		var y2 := TANK_TOP + run.y * SLOT_H - 3.0
+		var bx := r.end.x + 6
+		draw_line(Vector2(bx, y1), Vector2(bx, y2), c, 2.0)
+		draw_line(Vector2(bx - 4, y1), Vector2(bx, y1), c, 2.0)
+		draw_line(Vector2(bx - 4, y2), Vector2(bx, y2), c, 2.0)
+	if not playing:
+		return
+	if hover >= 0 and hover != selected:
+		var hp := algo.pair_at(board, hover)
+		if not hp.is_empty():
+			draw_rect(Rect2(r.position.x + 2, TANK_TOP + hp[0].x * SLOT_H + 1, TANK_W - 4, (hp[1].y - hp[0].x) * SLOT_H - 2), Palette.MUTED, false, 1.0)
+	var pair := algo.pair_at(board, selected)
+	if pair.is_empty():
+		return
+	var y1 := TANK_TOP + pair[0].x * SLOT_H + 1
+	var y2 := TANK_TOP + pair[1].y * SLOT_H - 1
+	var pulse := 0.75 + 0.25 * sin(time * 6.0)
+	draw_rect(Rect2(r.position.x + 1, y1, TANK_W - 2, y2 - y1), Color(Palette.GOLD, pulse), false, 2.0)
+	# Where the two runs meet.
+	var my := TANK_TOP + pair[1].x * SLOT_H
+	draw_line(Vector2(r.position.x + 6, my), Vector2(r.end.x - 6, my), Color(Palette.GOLD, 0.5 * pulse), 1.0)
+	_marker(Vector2(r.position.x, (y1 + y2) * 0.5))
+	var lane := r.end.x + 16
+	var cy := (y1 + y2) * 0.5
+	_text(tr("MERGE_LABEL"), Vector2(lane, cy - 2), S, Palette.GOLD)
+	var cost := algo.move_cost(board, {"type": Events.MERGE, "index": selected})
+	_text(tr("COST_N") % cost, Vector2(lane, cy + 14), S, Palette.BAD if cost > session.room.budget else Palette.TEXT)
+
+
+## Heap: a line from every number of the tree to its parent, out on the
+## right (red while the child is bigger: the heap needs fixing there), and
+## what SPACE does to the selected number (lift it, or pop the root).
+func _draw_heap_guides(r: Rect2, playing: bool) -> void:
+	var board := session.room.board
+	var h := _tree_size()
+	for i in range(1, h):
+		var p := HeapAlgorithm.parent(i)
+		var lane := r.end.x + 3 + 4 * p
+		var yc := _slot_pos(i).y
+		var yp := _slot_pos(p).y
+		var bad := board.value_at(i) > board.value_at(p)
+		var on := playing and selected == i
+		var c := Palette.GOLD if on else (Palette.BAD if bad else Palette.SOFT.darkened(0.35))
+		var wdt := 2.0 if on else 1.0
+		draw_line(Vector2(r.end.x - 2, yc), Vector2(lane, yc), c, wdt)
+		draw_line(Vector2(lane, yc), Vector2(lane, yp), c, wdt)
+		draw_line(Vector2(lane, yp), Vector2(r.end.x - 2, yp), c, wdt)
+	if not playing or h == 0:
+		return
+	if hover >= 0 and hover != selected and hover < h:
+		var hp := _slot_pos(hover)
+		draw_rect(Rect2(hp - Vector2(EL_W, EL_H) * 0.5, Vector2(EL_W, EL_H)).grow(3), Palette.MUTED, false, 1.0)
+	if selected < 0 or selected >= h:
+		return
+	var sp := _slot_pos(selected)
+	var pulse := 0.75 + 0.25 * sin(time * 6.0)
+	draw_rect(Rect2(sp - Vector2(EL_W, EL_H) * 0.5, Vector2(EL_W, EL_H)).grow(3), Color(Palette.GOLD, pulse), false, 2.0)
+	_marker(Vector2(r.position.x, sp.y))
+	# Right of the tree lines, which reach 3 + 4 × 3 px out for 8 cells.
+	_text(tr("HEAP_POP") if selected == 0 else tr("HEAP_LIFT"), Vector2(r.end.x + 20, sp.y + 6), S, Palette.GOLD)
+
+
+## The Memory Leak's lost cells: dark and crossed, at the top of the column.
+func _draw_leaked(r: Rect2) -> void:
+	var board := session.room.board
+	for i in range(board.capacity, session.full_capacity):
+		var y := _slot_pos(i).y - SLOT_H * 0.5
+		var cell := Rect2(r.position.x + 1, y + 1, r.size.x - 2, SLOT_H - 2)
+		draw_rect(cell, Palette.BG.darkened(0.4))
+		draw_line(cell.position, cell.end, Palette.PANEL_EDGE, 1.0)
+		draw_line(Vector2(cell.position.x, cell.end.y), Vector2(cell.end.x, cell.position.y), Palette.PANEL_EDGE, 1.0)
+		Icons.draw_boss(self, Rect2(cell.get_center() - Vector2(8, 8), Vector2(16, 16)), 0.6, RoomSession.BOSS_LEAK)
+
+
+## The cell the Memory Leak takes after your next move, and the number in it
+## when the column is full.
+func _draw_leak_aim(r: Rect2) -> void:
+	var i := session.room.board.capacity - 1
+	var y := _slot_pos(i).y - SLOT_H * 0.5
+	var grow := 6.0 * (1.0 - Anim.ease_out_back(aim_t / 0.3))
+	var a := 0.6 + 0.4 * sin(time * 10.0)
+	var box := Rect2(r.position.x - 2 - grow, y - grow, r.size.x + 4 + grow * 2, SLOT_H + grow * 2)
+	draw_rect(box, Color(Palette.BAD, a), false, 2.0)
+	var sign_pos := Vector2(box.position.x - 26, box.get_center().y - 12)
+	Icons.draw_boss(self, Rect2(sign_pos, Vector2(16, 16)), a, session.boss)
+	_text("!", Vector2(sign_pos.x + 5, sign_pos.y + 34), M, Color(Palette.BAD, a))
+	var board := session.room.board
+	for k in board.size():
+		if board.cells[k].uid in session.strike_uids:
+			var vp := _slot_pos(k)
+			draw_rect(Rect2(vp - Vector2(EL_W, EL_H) * 0.5, Vector2(EL_W, EL_H)).grow(2), Color(Palette.BAD, a), false, 2.0)
 
 
 ## What the boss will hit after your next move (a pair to swap, a number to
@@ -1494,6 +1717,10 @@ func _draw_rules() -> void:
 		_draw_rules_picture_pancake(Vector2(r.position.x + 24, r.position.y + 62))
 	elif is_quick():
 		_draw_rules_picture_quick(Vector2(r.position.x + 24, r.position.y + 62))
+	elif is_merge():
+		_draw_rules_picture_merge(Vector2(r.position.x + 24, r.position.y + 62))
+	elif is_heap():
+		_draw_rules_picture_heap(Vector2(r.position.x + 24, r.position.y + 62))
 	else:
 		_draw_rules_picture_insertion(Vector2(r.position.x + 24, r.position.y + 62))
 
@@ -1504,7 +1731,10 @@ func _draw_rules() -> void:
 	var keys: Array[String] = []
 	# Ship rooms drop the lines about numbers leaving by themselves (and
 	# Pancake's line about the exit: the picture and the ship lines say it).
-	var numbers := ([1, 3] if _bottom_up() else [1, 2, 3]) if is_ship() else [1, 2, 3, 4]
+	# Heap keeps its lift and pop lines; its picture shows the tree.
+	var numbers := [1, 2, 3, 4]
+	if is_ship():
+		numbers = [1, 3] if is_bubble() or is_pancake() else ([2, 3] if is_heap() else [1, 2, 3])
 	for i in numbers:
 		keys.append("RULES_%s_%d" % [algo, i])
 	if is_ship():
@@ -1525,6 +1755,13 @@ func _draw_rules() -> void:
 	var blink := 0.65 + 0.35 * sin(time * 3.0)
 	_text(tr("RULES_CLOSE"), Vector2(r.position.x, r.end.y - 10), S, Color(Palette.GOLD, blink), HORIZONTAL_ALIGNMENT_CENTER, r.size.x)
 	draw_set_transform_matrix(Transform2D.IDENTITY)
+
+
+## The row for a text with a count of moves: Polish says "2-4 ruchy" but
+## "5 ruchów", so a count of 5 or more (but 22-24 again) reads the _MANY row.
+static func _count_key(key: String, n: int) -> String:
+	var few := n % 10 >= 2 and n % 10 <= 4 and (n % 100 < 12 or n % 100 > 14)
+	return key if few or n == 1 else key + "_MANY"
 
 
 ## A rule line; the shipping rule names the shipment cap.
@@ -1557,7 +1794,7 @@ func _draw_boss_intro() -> void:
 	var y := 248.0
 	var lines: Array = [
 		[tr("BOSS_INTRO_%s_1" % boss), Palette.TEXT],
-		[tr("BOSS_INTRO_%s_2" % boss) % session.strike_every, Palette.TEXT],
+		[tr(_count_key("BOSS_INTRO_%s_2" % boss, session.strike_every)) % session.strike_every, Palette.TEXT],
 		[tr("BOSS_INTRO_SHIELD"), Palette.CHIPS.lightened(0.2)],
 	]
 	for line in lines:
@@ -1660,6 +1897,51 @@ func _draw_rules_picture_quick(o: Vector2) -> void:
 	draw_multiline_string(font, Vector2(o.x, o.y + 164), tr("RULES_PIC_QUICK"), HORIZONTAL_ALIGNMENT_LEFT, 160, S, 2, Palette.SOFT)
 
 
+## Merge: runs 3 7 and 2 5 (exit on top), merged into 2 3 5 7 for 3 moves.
+func _draw_rules_picture_merge(o: Vector2) -> void:
+	var before := [3, 7, 2, 5]
+	var after := [2, 3, 5, 7]
+	var lx := o.x + 32
+	var rx := o.x + 128
+	for cx in [lx, rx]:
+		draw_dashed_line(Vector2(cx - 30, o.y + 6), Vector2(cx + 30, o.y + 6), Palette.GOLD.darkened(0.3), 1.0, 4.0)
+		_text(tr("EXIT"), Vector2(cx - 30, o.y), S, Palette.GOLD.darkened(0.15), HORIZONTAL_ALIGNMENT_CENTER, 60)
+	for i in before.size():
+		_mini_box(Vector2(lx, o.y + 26 + i * 24), before[i])
+		_mini_box(Vector2(rx, o.y + 26 + i * 24), after[i])
+	# One bracket per run before, one around the merged run after.
+	var c := Palette.SOFT.darkened(0.2)
+	for run: Vector2 in [Vector2(0, 2), Vector2(2, 4)]:
+		draw_line(Vector2(lx + 34, o.y + 17 + run.x * 24), Vector2(lx + 34, o.y + 11 + run.y * 24), c, 2.0)
+	draw_line(Vector2(rx + 34, o.y + 17), Vector2(rx + 34, o.y + 107), Palette.GOLD, 2.0)
+	var ay := o.y + 62
+	draw_line(Vector2(lx + 40, ay), Vector2(rx - 38, ay), Palette.GOLD, 2.0)
+	draw_colored_polygon(PackedVector2Array([Vector2(rx - 36, ay), Vector2(rx - 43, ay - 4), Vector2(rx - 43, ay + 4)]), Palette.GOLD)
+	draw_multiline_string(font, Vector2(o.x, o.y + 164), tr("RULES_PIC_MERGE"), HORIZONTAL_ALIGNMENT_LEFT, 160, S, 2, Palette.SOFT)
+
+
+## Heap: a small tree (9 over 4 and 7, 1 under 4) drawn as a tree with the
+## root at the bottom, framed in gold: popping it is right.
+func _draw_rules_picture_heap(o: Vector2) -> void:
+	var cx := o.x + 76
+	draw_dashed_line(Vector2(cx - 40, o.y + 6), Vector2(cx + 40, o.y + 6), Palette.GOLD.darkened(0.3), 1.0, 4.0)
+	_text(tr("EXIT"), Vector2(cx - 40, o.y), S, Palette.GOLD.darkened(0.15), HORIZONTAL_ALIGNMENT_CENTER, 80)
+	var root := Vector2(cx, o.y + 120)
+	var left := Vector2(cx - 36, o.y + 80)
+	var right := Vector2(cx + 36, o.y + 80)
+	var leaf := Vector2(cx - 36, o.y + 40)
+	var c := Palette.SOFT.darkened(0.2)
+	for pair: Array in [[root, left], [root, right], [left, leaf]]:
+		draw_line(pair[0], pair[1], c, 2.0)
+	_mini_box(root, 9, Palette.GOLD)
+	_mini_box(left, 4)
+	_mini_box(right, 7)
+	_mini_box(leaf, 1)
+	_marker(Vector2(root.x - 30, root.y))
+	_text(tr("HEAP_POP"), Vector2(root.x + 34, root.y + 6), S, Palette.GOLD)
+	draw_multiline_string(font, Vector2(o.x, o.y + 164), tr("RULES_PIC_HEAP"), HORIZONTAL_ALIGNMENT_LEFT, 160, S, 2, Palette.SOFT)
+
+
 ## An elbow arrow from the key (at key_y) up to the gap (at gap_y).
 func _insert_arrow(from_x: float, lane_x: float, key_y: float, gap_y: float) -> void:
 	var lx := maxf(from_x, lane_x) + 8.0
@@ -1674,7 +1956,7 @@ func _insert_arrow(from_x: float, lane_x: float, key_y: float, gap_y: float) -> 
 # --- helpers -----------------------------------------------------------------
 
 func _tank_bottom() -> float:
-	return TANK_TOP + session.room.board.capacity * SLOT_H
+	return TANK_TOP + session.full_capacity * SLOT_H
 
 
 func _slot_pos(i: int) -> Vector2:

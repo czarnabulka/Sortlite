@@ -14,9 +14,15 @@ const SWAP := &"swap"
 const INSERT := &"insert"
 const FLIP := &"flip"
 const PARTITION := &"partition"
+const MERGE := &"merge"
+## Heap: a number trades places with its parent.
+const SIFT := &"sift"
+## Heap: the root goes to the sorted tail at the exit.
+const POP := &"pop"
 ## Ship rooms: the player sends the ready run out. Move: {"type": SHIP, "count": n}.
 const SHIP := &"ship"
-## A shipment is about to score. data: room, count, values, mult, patterns.
+## A shipment is about to score. data: room, count, values, mult, patterns;
+## handlers may add patterns and change mult.
 const HAND := &"hand"
 const WRONG_MOVE := &"wrong_move"
 ## An element is about to score. data.ctx is a ScoreContext; handlers change points / mult.
@@ -38,5 +44,7 @@ const BOSS_STRIKE := &"boss_strike"
 const BOSS_DODGED := &"boss_dodged"
 ## A boss reached its second phase (half of the target scored). data: room.
 const BOSS_ENRAGED := &"boss_enraged"
+## The Memory Leak gave a cell back after a long shipment. data: room.
+const MEMORY_FREED := &"memory_freed"
 ## A boss's phase shield stopped points (Room.score_cap). data: room, blocked.
 const BOSS_SHIELD := &"boss_shield"

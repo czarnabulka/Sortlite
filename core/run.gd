@@ -22,7 +22,7 @@ const SKIP_BITS := 3
 ## Quick rooms with one shipment in 43% of runs (16% with it).
 const MAX_SHIP := 6
 ## The shop opens once this many rooms are cleared (not after the last one).
-const SHOP_AFTER: Array[int] = [2, 4, 6]
+const SHOP_AFTER: Array[int] = [2, 4, 6, 8, 10]
 const SHOP_SIZE := 3
 ## A player who buys nothing holds about 13 bits at the first shop and 37
 ## at the second: an item costs more than a free pick, about one per visit.
@@ -108,6 +108,26 @@ const ROOMS := {
 	&"boss_burnt": {"kind": BOSS, "algorithm": Algorithms.PANCAKE, "boss": RoomSession.BOSS_BURNT,
 			"strike_every": 4, "start": 5, "every_moves": 4, "target": 1800, "budget": 56,
 			"ship_cfg": {"target": 10500, "ships": 12}},
+	# Floor 3, tuned for a full hand of 6 items (`--items 6`). Merge: a merge
+	# costs its two runs' length less one, so balanced merges are cheap. Like
+	# Quick, a merge hands out a long ready run at once, so waiting is worth
+	# less: 4 shipments, and greedy still wins about a third.
+	&"fight_merge": {"kind": FIGHT, "algorithm": Algorithms.MERGE, "target": 4000, "budget": 40,
+			"ship_cfg": {"every_moves": 3, "target": 10000, "ships": 4}},
+	# Heap: lifts and pops cost 1 each, but a number takes 4-5 of them (lift
+	# it in, pop it, sift the new root down), so newcomers come slower.
+	&"fight_heap": {"kind": FIGHT, "algorithm": Algorithms.HEAP, "target": 4000, "budget": 44,
+			"every_moves": 5, "ship_cfg": {"every_moves": 5, "target": 14000, "ships": 6}},
+	# Reversed data: every number a run of its own.
+	&"elite_merge": {"kind": ELITE, "algorithm": Algorithms.MERGE, "kind_data": DataGen.REVERSED, "start": 7,
+			"target": 4000, "budget": 44, "ship_cfg": {"every_moves": 3, "target": 11000, "ships": 4}},
+	# Nearly ascending data is the worst for a max-heap: the small ones sit on top.
+	&"elite_heap": {"kind": ELITE, "algorithm": Algorithms.HEAP, "kind_data": DataGen.NEARLY, "start": 5,
+			"target": 4000, "budget": 48, "every_moves": 5, "ship_cfg": {"every_moves": 5, "target": 14000, "ships": 6}},
+	# The Memory Leak: a Heap room whose column loses cells.
+	&"boss_leak": {"kind": BOSS, "algorithm": Algorithms.HEAP, "boss": RoomSession.BOSS_LEAK,
+			"strike_every": 6, "start": 5, "every_moves": 5, "target": 2400, "budget": 64,
+			"ship_cfg": {"target": 14000, "ships": 12}},
 }
 
 ## The floors of a run, in order. A fight entry lists the rooms it is drawn
@@ -117,12 +137,15 @@ const FLOORS := [
 			"elites": [&"elite_bubble", &"elite_insertion"], "boss": &"boss_adversary"},
 	{"fights": [[&"fight_pancake"], [&"fight_quick"]],
 			"elites": [&"elite_pancake", &"elite_quick"], "boss": &"boss_burnt"},
+	{"fights": [[&"fight_merge"], [&"fight_heap"]],
+			"elites": [&"elite_merge", &"elite_heap"], "boss": &"boss_leak"},
 ]
 
 
 ## Floor 1: a Bubble and an Insertion fight, an elite on harder data, and the
 ## Adversary, whose newcomers are the worst ones. Floor 2: a Pancake and a
-## Quick fight, an elite of one of them, and the Burnt Stack.
+## Quick fight, an elite of one of them, and the Burnt Stack. Floor 3: a
+## Merge and a Heap fight, an elite of one of them, and the Memory Leak.
 ## Every room carries its "floor" (1, 2, ...).
 static func floor_plan(r: RandomNumberGenerator) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
@@ -333,15 +356,17 @@ func _make_shop() -> void:
 
 
 ## Items that may be offered or sold now: not owned, and not for an
-## algorithm with no room left ahead.
+## algorithm with no room left on this floor.
 func _pool() -> Array[StringName]:
 	var owned := {}
 	for item in items:
 		owned[item.id] = true
-	# An item for one algorithm is offered only while a room of it is ahead.
+	# An item for one algorithm is offered only on a floor with a room of it
+	# still ahead: offered earlier, it would sit in a slot for floors.
 	var ahead := {}
 	for i in range(cleared, plan.size()):
-		ahead[plan[i]["algorithm"]] = true
+		if int(plan[i]["floor"]) == floor_no():
+			ahead[plan[i]["algorithm"]] = true
 	var pool: Array[StringName] = []
 	for id in ItemCatalog.IDS:
 		var only: StringName = ItemCatalog.make(id).algorithm

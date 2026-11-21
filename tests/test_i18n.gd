@@ -112,7 +112,8 @@ func test_built_keys_exist() -> void:
 			check(rows.has(key + b), "%s%s" % [key, b])
 		for i in [1, 2]:
 			check(rows.has("BOSS_INTRO_%s_%d" % [b, i]), "boss intro %s %d" % [b, i])
-	for key in ["HINT_ADVERSARY", "WRONG_INSERT", "WRONG_SWAP", "WRONG_FLIP", "HELP_RULES", "BOSS_INTRO_SHIELD"]:
+		check(rows.has("BOSS_INTRO_%s_2_MANY" % b), "boss intro %s with 5+ moves" % b)
+	for key in ["EVERY_N_MOVES_MANY", "HINT_ADVERSARY", "WRONG_INSERT", "WRONG_SWAP", "WRONG_FLIP", "HELP_RULES", "BOSS_INTRO_SHIELD"]:
 		check(rows.has(key), key)
 
 

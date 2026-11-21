@@ -57,6 +57,10 @@ func sounds() -> Dictionary:
 		"flip": [OFTEN, [v(0, 0.09, "noise", 3000, 12000, 0.35, 0.05, 5000), v(0, 0.09, "tri", m(60), m(72), 0.5, 0.06), v(0.085, 0.06, "pulse", m(76), -1, 0.4, 0.025, 4000, 0.25), v(0.085, 0.06, "tri", m(64), -1, 0.5, 0.03)]],
 		# Partition: the segment splits, one voice up and one down.
 		"partition": [OFTEN, [v(0, 0.13, "pulse", m(76), m(88), 0.35, 0.06, 4000, 0.25), v(0, 0.13, "pulse", m(76), m(64), 0.35, 0.06, 4000, 0.125), v(0, 0.02, "noise", 5000, -1, 0.25, 0.008, 5000)]],
+		# Merge: two runs close into one, a voice from each side meeting.
+		"merge": [OFTEN, [v(0, 0.12, "pulse", m(84), m(76), 0.35, 0.06, 4000, 0.25), v(0, 0.12, "pulse", m(64), m(76), 0.35, 0.06, 4000, 0.125), v(0.115, 0.05, "tri", m(76), -1, 0.6, 0.025)]],
+		# Pop: the root jumps to the top of the column, a quick upward blip.
+		"pop": [OFTEN, [v(0, 0.06, "pulse", m(67), m(79), 0.4, 0.04, 4000, 0.25), v(0.055, 0.07, "tri", m(84), -1, 0.6, 0.03), v(0, 0.02, "noise", 6000, -1, 0.15, 0.008, 6000)]],
 		# Wrong: a low buzzy "nuh-uh".
 		"wrong": [EVENT, [v(0, 0.07, "pulse", m(57), -1, 0.5, 0.2, 1800, 0.5), v(0.08, 0.12, "pulse", m(53), -1, 0.5, 0.08, 1800, 0.5)]],
 		# Arrive: a number drops in, a soft plop.
