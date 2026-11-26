@@ -203,7 +203,7 @@ func set_session(p_session: RoomSession, p_room_no: int, p_room_total: int, p_ki
 	bus.on(Events.POP, _on_pop)
 	bus.on(Events.MEMORY_FREED, _on_memory_freed)
 	bus.on(Events.WRONG_MOVE, _on_wrong)
-	bus.on(Events.SURFACE, _on_surface)
+	bus.on(Events.SCORED, _on_scored)
 	bus.on(Events.CHAIN, _on_chain)
 	bus.on(Events.HAND, _on_hand)
 	bus.on(Events.OVERFLOW, _on_overflow)
@@ -763,7 +763,10 @@ func _on_wrong(data: Dictionary) -> void:
 		_float(text, Vector2(TANK_CX - w * 0.5, _slot_pos(j).y + 6), Palette.BAD, M)
 
 
-func _on_surface(data: Dictionary) -> void:
+## A number scored. Its ghost carries what the room really gained: a boss's
+## phase shield (Room.score_cap) may have stopped part of ctx.total(), and
+## counting that part drew the boss at 0 HP while it was still alive.
+func _on_scored(data: Dictionary) -> void:
 	var ctx: ScoreContext = data["ctx"]
 	var g := Ghost.new()
 	g.value = ctx.element.value
@@ -774,7 +777,7 @@ func _on_surface(data: Dictionary) -> void:
 	g.delay = SWAP_DUR + (ctx.chain - 1) * CHAIN_STEP
 	g.points = ctx.points
 	g.mult = ctx.mult
-	g.gained = ctx.total()
+	g.gained = int(data["gained"])
 	g.notes = ctx.notes.duplicate()
 	g.effects = ctx.effects.duplicate(true)
 	ghosts.append(g)

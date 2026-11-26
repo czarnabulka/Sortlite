@@ -274,6 +274,21 @@ func test_boss_shield_stops_points_at_half_until_enraged() -> void:
 			check_eq(entry["data"]["blocked"], 7000, "what the shield stopped")
 
 
+## The screen counts what the room gained, not what the shield stopped:
+## counting the blocked points drew the boss at 0 HP while it was alive.
+func test_screen_score_skips_points_the_shield_stopped() -> void:
+	var s := _shield_session(1000)
+	var view: Node2D = load("res://ui/room_view.gd").new()
+	view.font = view.load_pixel_font()  # _ready() runs only in a tree
+	view.set_session(s, 1, 1, Run.BOSS, 0)
+	check(s.play({"type": Events.SHIP, "count": 5}), "ship the straight")
+	var drawn := 0
+	for g in view.ghosts:
+		drawn += g.gained
+	check_eq(drawn, s.room.score, "points the screen will add up")
+	check(s.is_playing(), "the boss is still alive")
+	view.free()
+
 func test_boss_shield_lets_phase_two_points_through() -> void:
 	var s := _shield_session(1000)
 	s.play({"type": Events.SHIP, "count": 1})  # 12 alone: 120, under the shield
